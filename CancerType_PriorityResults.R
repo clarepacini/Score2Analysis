@@ -121,7 +121,7 @@ allctypes<-unique(allMarkers$ANALYSIS)
 TOTRES<-read.table(sep='\t',file=paste0(inputdata,"Table_TotalRes.txt"),header=T,stringsAsFactors = F)
 CTC<-TissueTypeColors
 names(CTC)<-make.names(names(TissueTypeColors))
-TOTRES<-GLOBAL[,c("ctype","TARGET","PRIORITYL3","TRACTABILITY","MARKERCLASS","RWRscore")]
+TOTRES<-GLOBAL[,c("ctype","TARGET","PRIORITY","TRACTABILITY","MARKERCLASS","RWRscore")]
 colnames(TOTRES)[4]<-"BUCKET"
 superPriorityPlot(TOTRES=TOTRES,allMarkers=allMarkers,plotname=outputdata,TissueColors=CTC,shape="Biomarker",indi="RWR")
 
