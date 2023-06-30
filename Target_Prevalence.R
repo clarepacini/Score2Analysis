@@ -73,41 +73,7 @@ ctypes<-unique(GdfSplit$ctype)
 
 #Get all the patient data available for cancer types included in our data set - this is total pan cancer number of patients.
 
-Get_PatientMarkers<-function(ctype){
-  tcgaid<-ctypeMapSubtype[match(ctype,make.names(ctypeMapSubtype[,1])),8]
-  #Check whether it is tissue or subtype and then get the correct matrices.
-  if(tcgaid%in%names(GeneP1Upv2)){
-    ExprInc<-GeneP1Upv2[[tcgaid]]
-    ExprDec<-GeneP1Downv2[[tcgaid]]
-  }else{
-    
-    ExprInc<-GeneP2Upv2[[tcgaid]]
-    ExprDec<-GeneP2Downv2[[tcgaid]]
-  }
-  colnames(ExprInc)<-unlist(sapply(colnames(ExprInc),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
-  colnames(ExprDec)<-unlist(sapply(colnames(ExprDec),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
-  ExpSamples<-intersect(colnames(ExprInc),colnames(ExprDec))
-  tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
-  CNgain<-CNgainMat[[tcgaid]]
-  CNloss<-CNlossMat[[tcgaid]]
-  #mutect, varscan:
-  tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
-  Mutmat1<-TCGAmut[[paste0(tcgaid,".mutect")]]
-  Mutmat2<-TCGAmut[[paste0(tcgaid,".varscan")]]
-  msamples<-intersect(colnames(Mutmat1),colnames(Mutmat2))
-  mgenes<-intersect(rownames(Mutmat1),rownames(Mutmat2))
-  Mmat<-Mutmat1[mgenes,msamples]+Mutmat2[mgenes,msamples]
-  
-  Mmat<-(Mmat==2)+0
-  
-  Psamples<-intersect(colnames(Mmat),intersect(intersect(colnames(CNgain),colnames(CNloss)),ExpSamples))
-  Nsamples<-length(Psamples)
-  if(Nsamples>0){
-    return(list(Nsamples=Nsamples,Mmat=Mmat,CNgain=CNgain,CNloss=CNloss,ExprInc=ExprInc,ExprDec=ExprDec))
-  }else{
-    return(NULL)
-  }
-}
+
 SampleNos<-list()
 for(i in ctypes){
   output<-Get_PatientMarkers(i)
