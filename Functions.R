@@ -1432,7 +1432,7 @@ msplitF<-function(markerrow,featCol="FEATURE",typeCol="MARKER_TYPE",assoCol="ASS
   return(newRes)
 }
 
-Get_PrevalenceMatrix<-function(PriorityTargets,MutMat,CNgain,CNloss,ExprMat=NULL,ExprUp=NULL,ExprDown=NULL,Mcol="MARKER_TYPE",Score="PRIORITYL3"){
+Get_PrevalenceMatrix<-function(PriorityTargets,MutMat,CNgain,CNloss,ExprMat=NULL,ExprUp=NULL,ExprDown=NULL,Mcol="MARKER_TYPE",Score="PRIORITY"){
   PT<-PriorityTargets[order(PriorityTargets[,Score],decreasing=T),]
   PT$M<-unlist(sapply(PT$MARKER,function(x) gsub(" ","",strsplit(x,"_",fixed=T)[[1]][1])))
   if(!is.null(ExprMat)){
@@ -1604,7 +1604,7 @@ Plot_PrevalenceHM<-function(PrevMat,PriorityRes,plotCol,outputname=NULL,DFA=NULL
   tractCols = brewer.pal(7,"Blues")
   names(tractCols)<-as.character(c(1:7))
   
-  PScore<-PRes[match(nTargets,paste(PRes$TARGET,PRes$M,sep=":")),"PRIORITYL3"]
+  PScore<-PRes[match(nTargets,paste(PRes$TARGET,PRes$M,sep=":")),"PRIORITY"]
   names(PScore)<-nTargets
   PScore<-as.numeric(PScore)
   Tgroups<-as.character(PRes[match(nTargets,paste(PRes$TARGET,PRes$M,sep=":")),"GROUP"])
