@@ -73,9 +73,9 @@ for(i in 1:length(GOBPEnrichNMF)){
 }
 
 GOBPfilt2<-GOBPfilt
-idx<-c(2,3,1)
+
 for(i in 1:length(GOBPfilt)){
-  temp<-GOBPfilt[[idx[i]]]
+  temp<-GOBPfilt[[i]]
   temp<-temp[order(temp[,"p_value"],decreasing=F),]
   nval<-min(nrow(temp),250)
   GOBPfilt2[[i]]<-temp[1:nval,]
