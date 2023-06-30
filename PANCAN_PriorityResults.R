@@ -8,7 +8,6 @@ GLOBAL<-read.table(file=paste0(inputdata,'Table_S9_allPriority_WithPPI_allPANCAN
 
 load(paste0(inputdata,'priority_threshold_all_PANCAN.RData'))
 load(paste0(inputdata,'39_allMarkers_all_PANCAN.Rdata'))
-load(paste0(inputdata,'39_allMarkers_all_PANCAN.Rdata'))
 load(paste0(inputdata,'/Pvectors_PANCAN.RData'))
 load(paste0(inputdata,'/PAI_PANCAN.RData'))
 load(paste0(inputdata,'/PAB_PANCAN.RData'))
@@ -42,7 +41,7 @@ th<-priority_threshold
 MARKERclass<-allMarkers
 
 
-TOTRES<-GLOBAL[,c("ctype","TARGET","PRIORITYL3","TRACTABILITY","MARKERCLASS","RWRscore")]
+TOTRES<-GLOBAL[,c("ctype","TARGET","PRIORITY","TRACTABILITY","MARKERCLASS","RWRscore")]
 colnames(TOTRES)[4]<-"BUCKET"
 superPriorityPlot(TOTRES=TOTRES,allMarkers=allMarkers,plotname=outputdata,TissueColors=cvec,shape="Biomarker",indi="RWR",plotsuffix="SuperPriorityPlotPC.pdf")
 
