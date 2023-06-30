@@ -1230,7 +1230,7 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
     
     id<-which(TOTRES$BUCKET==uu[i] & TOTRES$ctype!='PANCAN')
     id<-which(TOTRES$BUCKET==uu[i])
-    id<-id[order(TOTRES$PRIORITYL3[id],decreasing = TRUE)]
+    id<-id[order(TOTRES$PRIORITY[id],decreasing = TRUE)]
     
     genes<-TOTRES$TARGET[id]
     
@@ -1242,16 +1242,16 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
       xc<-seq(uu[i]-0.4,uu[i]+0.4,0.8/(ngenes-1))
     }
     
-    points(xc,TOTRES$PRIORITYL3[id],pch=TOTRES$shape[id],cex=4,
+    points(xc,TOTRES$PRIORITY[id],pch=TOTRES$shape[id],cex=4,
            bg=TissueColors_tr[TOTRES$ctype[id]],col=TissueColors[TOTRES$ctype[id]])
     if(sum(!is.na(TOTRES$symbol[id]))>0){
       idcheck<-id[which(!is.na(TOTRES$symbol[id]))]
-      points(xc[which(!is.na(TOTRES$symbol[id]))],TOTRES$PRIORITYL3[idcheck],pch=TOTRES$symbol[idcheck],cex=2)
+      points(xc[which(!is.na(TOTRES$symbol[id]))],TOTRES$PRIORITY[idcheck],pch=TOTRES$symbol[idcheck],cex=2)
     }
     #text(xc,TOTRES$PRIORITY[id],genes,pos = 4,cex=0.2)
     
     ALLX<-c(ALLX,xc)
-    ALLY<-c(ALLY,TOTRES$PRIORITYL3[id])
+    ALLY<-c(ALLY,TOTRES$PRIORITY[id])
     ALLLAB<-c(ALLLAB,genes)
   }
   
@@ -1271,7 +1271,7 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
   targets<-unique(unlist(allMarkers[which(is.element(allMarkers$Depleted.Gene,targets) & is.element(allMarkers$CLASS,c('A','B','C'))),3]))
   currentTOTRES<-TOTRES[id,]
   currentTOTRES<-currentTOTRES[which(is.element(currentTOTRES$TARGET,targets)),]
-  currentTOTRES<-currentTOTRES[order(currentTOTRES$PRIORITYL3,decreasing = TRUE),]
+  currentTOTRES<-currentTOTRES[order(currentTOTRES$PRIORITY,decreasing = TRUE),]
   
   
   
@@ -1281,7 +1281,7 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
   targets<-unique(unlist(allMarkers[which(is.element(allMarkers$Depleted.Gene,targets) & is.element(allMarkers$CLASS,c('A','B','C'))),3]))
   currentTOTRES<-TOTRES[id,]
   currentTOTRES<-currentTOTRES[which(is.element(currentTOTRES$TARGET,targets)),]
-  currentTOTRES<-currentTOTRES[order(currentTOTRES$PRIORITYL3,decreasing = TRUE),]
+  currentTOTRES<-currentTOTRES[order(currentTOTRES$PRIORITY,decreasing = TRUE),]
   
   
   
@@ -1292,7 +1292,7 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
     
     id<-which(TOTRES$BUCKET==uu[i] & TOTRES$ctype!='PANCAN')
     id<-which(TOTRES$BUCKET==uu[i])
-    id<-id[order(TOTRES$PRIORITYL3[id],decreasing = TRUE)]
+    id<-id[order(TOTRES$PRIORITY[id],decreasing = TRUE)]
     
     genes<-TOTRES$TARGET[id]
     
@@ -1304,23 +1304,23 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
       xc<-seq(uu[i]-0.4,uu[i]+0.4,0.8/(ngenes-1))
     }
     
-    points(xc,TOTRES$PRIORITYL3[id],pch=TOTRES$shape[id],cex=1,
+    points(xc,TOTRES$PRIORITY[id],pch=TOTRES$shape[id],cex=1,
            bg=TissueColors_tr[TOTRES$ctype[id]],col=TissueColors[TOTRES$ctype[id]])
     if(sum(!is.na(TOTRES$symbol[id]))>0){
       idcheck<-id[which(!is.na(TOTRES$symbol[id]))]
-      points(xc[which(!is.na(TOTRES$symbol[id]))],TOTRES$PRIORITYL3[idcheck],pch=TOTRES$symbol[idcheck],cex=1)
+      points(xc[which(!is.na(TOTRES$symbol[id]))],TOTRES$PRIORITY[idcheck],pch=TOTRES$symbol[idcheck],cex=1)
     }
     nID<-length(id)
     for(k in 1:nID){
-      if(TOTRES$PRIORITYL3[id[k]]>textThresh){
-        text(xc[k],TOTRES$PRIORITYL3[id[k]],genes[k],pos = 4,cex=pointsize)
+      if(TOTRES$PRIORITY[id[k]]>textThresh){
+        text(xc[k],TOTRES$PRIORITY[id[k]],genes[k],pos = 4,cex=pointsize)
         if(i==1){
           print(TOTRES[id[k],])
         }
       }
     }
     ALLX<-c(ALLX,xc)
-    ALLY<-c(ALLY,TOTRES$PRIORITYL3[id])
+    ALLY<-c(ALLY,TOTRES$PRIORITY[id])
     ALLLAB<-c(ALLLAB,genes)
   }
   plot(0,0,xlim=c(0,4),ylim=c(1,length(TissueColors)))
