@@ -1,3 +1,66 @@
+Get_CTtargetPrevalence<-function(GdfInput,ExcludeMarkers=NULL,IncGroup,ExcNoNetwork=FALSE,ScoreThresh=0,incGexp=TRUE,GexpOnly=FALSE){
+  PrevMat<-list()
+  GdfSplit<-GdfInput
+  for(i in ctypes){
+    idx<-which(GdfSplit$ctype==i)
+    T1<-GdfSplit[idx,]
+    
+    Tall<-T1
+    Tall<-Tall[Tall$GROUP%in%IncGroup,]
+    Tall<-Tall[!Tall$MARKER%in%ExcludeMarkers,]
+    if(ExcNoNetwork){
+      Tall<-Tall[Tall$RWRscore>0,]
+    }
+    Tall<-Tall[Tall$PRIORITY>ScoreThresh,]
+ 
+    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),8]
+    #Check whether it is tissue or subtype and then get the correct matrices.
+    if(tcgaid%in%names(GeneP1Upv2)){
+      ExprInc<-GeneP1Upv2[[tcgaid]]
+      ExprDec<-GeneP1Downv2[[tcgaid]]
+    }else{
+  
+      ExprInc<-GeneP2Upv2[[tcgaid]]
+      ExprDec<-GeneP2Downv2[[tcgaid]]
+    }
+    colnames(ExprInc)<-unlist(sapply(colnames(ExprInc),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+    colnames(ExprDec)<-unlist(sapply(colnames(ExprDec),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+    
+    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
+    CNgain<-CNgainMat[[tcgaid]]
+    CNloss<-CNlossMat[[tcgaid]]
+    #mutect, varscan:
+    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
+    Mutmat1<-TCGAmut[[paste0(tcgaid,".mutect")]]
+    Mutmat2<-TCGAmut[[paste0(tcgaid,".varscan")]]
+    msamples<-intersect(colnames(Mutmat1),colnames(Mutmat2))
+    mgenes<-intersect(rownames(Mutmat1),rownames(Mutmat2))
+    Mmat<-Mutmat1[mgenes,msamples]+Mutmat2[mgenes,msamples]
+    
+    Mmat<-(Mmat==2)+0
+    if(length(msamples)>1&!is.null(ExprInc)){
+
+      Pmat<-NULL
+      if(GexpOnly){
+        try(Pmat<-Get_PrevalenceMatrix(Tall[Tall[,"MARKER_TYPE"]=="expr",],Mmat,CNgain,CNloss,ExprUp=ExprInc,ExprDown=ExprDec))
+      }else{
+        if(incGexp){
+          try(Pmat<-Get_PrevalenceMatrix(Tall,Mmat,CNgain,CNloss,ExprUp=ExprInc,ExprDown=ExprDec))
+        }else{
+          try(Pmat<-Get_PrevalenceMatrix(Tall,Mmat,CNgain,CNloss))
+        }
+      }
+      PrevMat[[i]]<-Pmat
+     
+    }else{
+      PrevMat[[i]]<-NULL
+    
+    }
+    
+  }
+  return(PrevMat)
+
+}
 Get_PatientMarkers<-function(ctype){
   tcgaid<-ctypeMapSubtype[match(ctype,make.names(ctypeMapSubtype[,1])),8]
   #Check whether it is tissue or subtype and then get the correct matrices.
