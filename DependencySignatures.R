@@ -77,7 +77,7 @@ idx<-c(2,3,1)
 for(i in 1:length(GOBPfilt)){
   temp<-GOBPfilt[[idx[i]]]
   temp<-temp[order(temp[,"p_value"],decreasing=F),]
-  nval<-min(nrow(temp),15)
+  nval<-min(nrow(temp),250)
   GOBPfilt2[[i]]<-temp[1:nval,]
 }
 
@@ -103,7 +103,7 @@ for(i in 1:nrow(H)){
 outputdataU<-paste0(outputdata,"/NMFnqG",urank,"/")
 if(!dir.exists(outputdataU)){dir.create(outputdataU)}
 
-pdf(paste0(outputdataU,"/HeatmapGOBP_SigEnrichPval_filt15.pdf"),useDingbats = FALSE)
+pdf(paste0(outputdataU,"/HeatmapGOBP_SigEnrichPval_filt250.pdf"),useDingbats = FALSE)
 print(pheatmap(GOBPmat2,fontsize_row=6,cluster_cols=FALSE,cluster_rows=FALSE,treeheight_col = 0,show_colnames=F,treeheight_row = 0))
 dev.off()
 
