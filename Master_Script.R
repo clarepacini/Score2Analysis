@@ -5,7 +5,7 @@ source("./CellignerFunctions.R")
 
 outputdata<-"../outputdata/"
 if(!dir.exists(outputdata)){dir.create(outputdata)}
-inputdata<-"../InputData/"
+inputdata<-"/Path/To/Figshare/Directory/See/README"
 
 #Overview of dependency data:
 source("./DependencyResults.R")
