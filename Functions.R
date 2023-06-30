@@ -1,4 +1,39 @@
-AdamTissue<-function(Binary,annot,returnTissue=FALSE){
+Get_PatientMarkers<-function(ctype){
+  tcgaid<-ctypeMapSubtype[match(ctype,make.names(ctypeMapSubtype[,1])),8]
+  #Check whether it is tissue or subtype and then get the correct matrices.
+  if(tcgaid%in%names(GeneP1Upv2)){
+    ExprInc<-GeneP1Upv2[[tcgaid]]
+    ExprDec<-GeneP1Downv2[[tcgaid]]
+  }else{
+    
+    ExprInc<-GeneP2Upv2[[tcgaid]]
+    ExprDec<-GeneP2Downv2[[tcgaid]]
+  }
+  colnames(ExprInc)<-unlist(sapply(colnames(ExprInc),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+  colnames(ExprDec)<-unlist(sapply(colnames(ExprDec),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+  ExpSamples<-intersect(colnames(ExprInc),colnames(ExprDec))
+  tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
+  CNgain<-CNgainMat[[tcgaid]]
+  CNloss<-CNlossMat[[tcgaid]]
+  #mutect, varscan:
+  tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
+  Mutmat1<-TCGAmut[[paste0(tcgaid,".mutect")]]
+  Mutmat2<-TCGAmut[[paste0(tcgaid,".varscan")]]
+  msamples<-intersect(colnames(Mutmat1),colnames(Mutmat2))
+  mgenes<-intersect(rownames(Mutmat1),rownames(Mutmat2))
+  Mmat<-Mutmat1[mgenes,msamples]+Mutmat2[mgenes,msamples]
+  
+  Mmat<-(Mmat==2)+0
+  
+  Psamples<-intersect(colnames(Mmat),intersect(intersect(colnames(CNgain),colnames(CNloss)),ExpSamples))
+  Nsamples<-length(Psamples)
+  if(Nsamples>0){
+    return(list(Nsamples=Nsamples,Mmat=Mmat,CNgain=CNgain,CNloss=CNloss,ExprInc=ExprInc,ExprDec=ExprDec))
+  }else{
+    return(NULL)
+  }
+}
+                                   AdamTissue<-function(Binary,annot,returnTissue=FALSE){
   CCRlabels<-data.frame(name=colnames(Binary),sidm=annot[match(colnames(Binary),annot$model_id),"tissue"],bid=annot[match(colnames(Binary),annot$BROAD_ID),"tissue"],stringsAsFactors = FALSE)
   
   CCRlabels[is.na(CCRlabels[,2]),2]<-0
