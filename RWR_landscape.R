@@ -31,8 +31,7 @@ allrwr<-allrwr[!is.na(allrwr$AnovaClass),]
 #                                                                                               #
 #                                                                                               #
 #################################################################################################
-Usegroups<-c("SL","LoF_other_SL","LoF_mutation_SL","Paralog","SelfAddiction_Mutation","SelfAddiction_Expression","SelfAddiction_Variant","OncogenicAddiction_Act",
-             "SelfAddiction_CN","Addiction")
+
 DFRdataT<-cbind(DFRdata,DFRsplit[,c(1:11,13:14)])
 DFRuse<-DFRdataT[rowSums(DFRdataT[,33:45])>0,]
 DFRuse$AddictionGroup<-rowSums(DFRuse[,c("SelfAddiction_Mutation","SelfAddiction_Expression","SelfAddiction_Variant","Target_cancerDriverAct",
