@@ -113,29 +113,7 @@ GexpG12<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers="TP53_mut",IncGroup=c(1,
 
 
 #All groups:
-Get_PatientPrev<-function(Pmat,removeTop=0,Nsamples){
-  if(removeTop!=0){
-    for(i in 1:length(Pmat)){
-      temp<-Pmat[[i]]
-      check<-sum(rowSums(temp,na.rm=T)/ncol(temp)<removeTop)>0
-      if(sum(check)>0){
-        Pmat[[i]]<-Pmat[[i]][check,]
-      }else{
-        Pmat[[i]]<-matrix(0,nrow=1,ncol=ncol(temp))
-      }
-    }
-    
-  }
 
-    NoPatientsOneTarget<-lapply(Pmat,function(x) try(colSums(x,na.rm=T)>0))
-    PropPatientperCT<-lapply(NoPatientsOneTarget,function(x) try(sum(x)/length(x)))
-    PropPatientpc<-sum(unlist(NoPatientsOneTarget)/Nsamples)
-  
-  TargetsPP<-lapply(Pmat,function(x) try(colSums(x,na.rm=T)))
-  TargetsPPperCT<-lapply(TargetsPP,mean)
-  TargetsPPpc<-mean(unlist(TargetsPPperCT))
-  return(list(PropCT=PropPatientperCT,PropPC=PropPatientpc,AvgTppCT=TargetsPPperCT,AvgTppPC=TargetsPPpc))
-}
 
 
 AllG<-Get_PatientPrev(Pall,Nsamples=TotalSamples)
