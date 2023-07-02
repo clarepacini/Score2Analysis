@@ -50,19 +50,6 @@ cat(paste("Number genes with strongest marker: ",length(unique(DFRa$TARGET))),fi
 DFRa$M<-unlist(sapply(DFRa$FEATURE,function(x) strsplit(x,"_",fixed=T)[[1]][1]))
 DFRa$PPI_min<-unlist(sapply(1:nrow(DFRa),function(x) ifelse(DFRa[x,"M"]==DFRa[x,"TARGET"],0,6)))
 
-deps<-unique(DFRa$TARGET)
-temp<-NULL
-for(i in deps){
-  sel<-DFRa[which(DFRa$TARGET==i),]
-  if(nrow(sel)==1){
-    temp<-rbind(temp,sel)
-  }else{
-    selfeat<-which.min(sel$FDR)
-    temp<-rbind(temp,sel[selfeat,])
-  }
-}
-DFRab<-temp
-
 
 DFRe<-DFRP[DFRP$FDR<1&abs(DFRP$logFC)>0.5,]
 
@@ -83,21 +70,7 @@ cat(paste("Median number of feature, permissive set all: ",median(table(DFRe$TAR
 cat(paste("Minimum number of feature, permissive set all: ",min(table(DFRe$TARGET))),file=paste0(outputdata,"/DMAlandscape.txt"),sep="\n",append=T)
 cat(paste("Maximum number of feature, permissive set all: ",max(table(DFRe$TARGET))),file=paste0(outputdata,"/DMAlandscape.txt"),sep="\n",append=T)
 
-deps<-unique(DFRe$TARGET)
-temp<-NULL
-for(i in deps){
-  sel<-DFRe[which(DFRe$TARGET==i),]
-  if(nrow(sel)==1){
-    temp<-rbind(temp,sel)
-  }else{
-    selfeat<-which.min(sel$FDR)
-    temp<-rbind(temp,sel[selfeat,])
-  }
-}
-DFReb<-temp
 
-DFReb$M<-unlist(sapply(DFReb$FEATURE,function(x) strsplit(x,"_",fixed=T)[[1]][1]))
-DFReb$PPI_min<-unlist(sapply(1:nrow(DFReb),function(x) ifelse(DFReb[x,"M"]==DFReb[x,"TARGET"],0,6)))
 #################################################################################################
 #                                                                                               #
 #   Plot of number of markers per dependency                                                    #
