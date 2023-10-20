@@ -65,6 +65,50 @@ dev.off()
 
 #################################################################################################
 #                                                                                               #
+#   EMT status of transcriptional profiles                                                      #
+#                                                                                               #
+#                                                                                               #
+#################################################################################################
+
+
+
+load(file=paste0(inputdata,"/AllEMT.Rdata"))
+names(AllEMT)<-make.names(names(AllEMT))
+EMTpdata<-umapLocs
+EMTpdata$EMTscore<-AllEMT[rownames(EMTpdata)]
+EMTbreaks<-seq(-2,2,1)
+EMTpdata$EMTgroup<-1
+EMTpdata[EMTpdata$EMTscore<2,"EMTgroup"]<-2
+EMTpdata[EMTpdata$EMTscore<1,"EMTgroup"]<-3
+EMTpdata[EMTpdata$EMTscore<0,"EMTgroup"]<-4
+EMTpdata[EMTpdata$EMTscore<(-1),"EMTgroup"]<-5
+EMTpdata[EMTpdata$EMTscore<(-2),"EMTgroup"]<-6
+EMTpdata$cluster<-meta.data[rownames(EMTpdata),"cluster"]
+EMTpdata<-EMTpdata[!is.na(EMTpdata$cluster),]
+
+pdf(paste0(outputdata,"Umap_type.pdf"),useDingbats = FALSE)
+print(ggplot(EMTpdata,aes(x=UMAP_1,y=UMAP_2,color=type))+geom_point(aes(color=type),size=0.2,show.legend = TRUE)+scale_colour_manual(values=c("CL"="red","tumour"="grey"))+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")))
+dev.off()
+
+pdf(paste0(outputdata,"Umap_lineage.pdf"),useDingbats = FALSE,width=10,height=5)
+print(ggplot(EMTpdata,aes(x=UMAP_1,y=UMAP_2,color=lineage))+geom_point(aes(color=lineage),size=0.2,show.legend = TRUE)+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")))
+dev.off()
+
+pdf(paste0(outputdata,"Umap_EMT.pdf"),useDingbats = FALSE)
+print(ggplot(EMTpdata,aes(x=UMAP_1,y=UMAP_2,color=EMTscore))+geom_point(aes(color=EMTscore),size=0.2)+scale_colour_viridis_c()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.background = element_blank(), axis.line = element_line(colour = "black")))
+dev.off()
+
+
+
+
+#################################################################################################
+#                                                                                               #
 #   Create feature labels for pan cancer clusters                                               #
 #                                                                                               #
 #                                                                                               #
@@ -124,23 +168,43 @@ cat("\n",file=paste0(outputdata,"/CellignerAnalysis.txt"),append=T)
 #################################################################################################
 
 
-load(paste0(inputdata,"CellignerData.Rdata"))
-
-meta.data$sampleID<-rownames(meta.data)
-colnames(tCI)<-make.names(colnames(tCI))
-tCI<-as.matrix(tCI)
 
 #load in precomputed as can take time to calculate
 #tumor_CL_cor<-calc_tumor_CL_cor(tCI,meta.data)
 #save(tumor_CL_cor,file="/Volumes/GoogleDrive/My Drive/Priorityv2//tumor_CL_cor.Rdata")
 load(paste0(inputdata,"tumor_CL_cor.Rdata"))
+meta.data$lineage<-tolower(meta.data$lineage)
 unknownT<-meta.data[meta.data$lineage=="unknown","sampleID"]
 tumor_CL_cor<-tumor_CL_cor[setdiff(rownames(tumor_CL_cor),unknownT),]
 tumor_CL_cor<-tumor_CL_cor[,setdiff(colnames(tumor_CL_cor),unknownT)]
+rownames(meta.data)<-meta.data$sampleID
+rownames(meta.data)<-make.names(rownames(meta.data))
+meta.data$sampleID<-rownames(meta.data)
+meta.emt<-meta.data
+meta.emt$lineage<-NA
 
+meta.emt[rownames(EMTpdata),"lineage"]<-EMTpdata$EMTgroup
 
+cl_tumour_classesE<-get_cell_line_tumor_class(tumor_CL_cor,meta.emt)
+
+classfreqE<-cell_line_tumor_class_plot(cl_tumour_classesE,meta.emt,tumor_CL_cor,paste0(outputdata,"/CellignerMatch_EMT.pdf"))
+CEm<-as.matrix(classfreqE)
+diag(CEm)
 cl_tumour_classes<-get_cell_line_tumor_class(tumor_CL_cor,meta.data,removeUnknown = FALSE)
 
 classfreq<-cell_line_tumor_class_plot(cl_tumour_classes,meta.data,tumor_CL_cor,paste0(outputdata,"/CellignerMatch.pdf"))
+cfmat<-as.matrix(classfreq)
+cfval<-diag(cfmat)
+
+all.equal(names(cl_tumour_classes),names(cl_tumour_classesE))
+Assignments<-cbind(cl_tumour_classes,cl_tumour_classesE)
+Assignments<-cbind(Assignments,meta.data[rownames(Assignments),"lineage"])
+Assignments<-cbind(Assignments,EMTpdata[rownames(Assignments),'EMTgroup'])
+matchLineage<-Assignments[,1]==Assignments[,3]
+matchEMT<-Assignments[,2]==Assignments[,4]
+Assignments<-cbind(Assignments,matchLineage,matchEMT)
+matchEither<-as.logical(Assignments[,5])|as.logical(Assignments[,6])
+Assignments<-cbind(Assignments,matchEither)
 
 
+sum(matchEither)/nrow(Assignments)

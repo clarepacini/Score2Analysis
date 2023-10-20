@@ -81,6 +81,7 @@ load(paste0(inputdata,"allpathway.Rdata"))
 normPath<-apply(allpathway,2,function(x) (x-mean(x))/sd(x))
 rownames(normPath)<-make.names(rownames(normPath))
 subtypescore<-NULL
+subtypetest<-NULL
 
 for(i in 1:length(useSubtypes)){
   sel<-which(make.names(ctypeMapSubtype[,1])==useSubtypes[i])
@@ -88,16 +89,29 @@ for(i in 1:length(useSubtypes)){
     cmpid<-ctypeMapSubtype[sel[1],4]
     print(cmpid)
     #extract cell lines:
-    print(useSubtypes[i])
-    
  
-      sel2<-which(names(allpartitionsC)==make.names(ctypeMapSubtype[sel[1],7]))
-      print(names(allpartitionsC)[sel2])
-      try({
+    
+    
+    sel2<-which(names(allpartitionsC)==make.names(ctypeMapSubtype[sel[1],7]))
+    print(names(allpartitionsC)[sel2])
+    try({
       partitionin<-allpartitionsC[sel2][[1]]
       npart<-length(unique(partitionin))
-
+      
       subtypeP<-sapply(1:npart,function(x) apply(normPath[intersect(names(partitionin)[partitionin==x],rownames(normPath)),],2,median))
+      #do wilcox test here for differences in pathway activities between patient clusters:
+      combPT<-combn(1:npart,2)
+      test1<-list()
+      for(j in 1:ncol(combPT)){
+        
+        test1[[j]]<-sapply(1:14,function(x) wilcox.test(normPath[intersect(names(partitionin)[partitionin==combPT[1,j]],rownames(normPath)),x],
+                                                        normPath[intersect(names(partitionin)[partitionin==combPT[2,j]],rownames(normPath)),x])$p.value)
+      }
+      temp<-do.call('rbind',test1)
+      temp<-matrix(p.adjust(temp,"BH"),ncol=14)
+      colnames(temp)<-colnames(normPath)
+      rownames(temp)<-apply(combPT,2,function(x) paste(useSubtypes[i],paste(x,collapse="-")))
+      subtypetest[[i]]<-temp
       
       colnames(subtypeP)<-paste(useSubtypes[i],1:npart,sep="_")
       if(is.null(subtypescore)){
@@ -105,14 +119,16 @@ for(i in 1:length(useSubtypes)){
       }else{
         subtypescore<-cbind(subtypescore,subtypeP)
       }
-      })
- 
+    })
+    
     
   }
 }
-pdf(paste0(outputdata,"/ProgenySubtype.pdf"),width=9,height=8)
-heatmap3(subtypescore,showRowDendro = FALSE,cexCol=0.3,showColDendro = FALSE)
-dev.off()
+names(subtypetest)<-useSubtypes
+allsubtypetest<-do.call('rbind',subtypetest)
+write.table(allsubtypetest,file=paste0(outputdata,"/wilcox_progeny.tsv"),quote=FALSE,sep="\t",col.names=NA)
 
-print(median(setdiff(unique(unlist(lapply(allmarkersSM,length))),0)))
+
+median(setdiff(unique(unlist(lapply(allmarkersSM,length))),0))
+
 

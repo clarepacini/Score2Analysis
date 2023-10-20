@@ -7,7 +7,7 @@ valData<-read.csv(paste0(inputdata,"ColoRes.csv"),stringsAsFactors = FALSE,heade
 
 
 
-####plot for WRN/BRCA2:
+####plot for WRN/BRCA2 paper:
 idmatch2<-cbind(clines,ids2)
 DoutT<-valData
 DoutT$cellline<-idmatch2[match(DoutT$Annotation,idmatch2[,1]),2]

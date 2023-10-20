@@ -39,7 +39,7 @@ dev.off()
 median(nmfRes2_10$measures$cophenetic)
 median(nmfRes2_10$measures$silhouette.consensus)
 urank<-3
-
+set.seed(123)
 nmfRes<-nmf(inputdataNMF[setdiff(topLRTgenes,union(PanCancerCoreFitnessGenes,CommonEssentialsAUC$cfgenes)),],urank,seed=123)
 W<-nmfRes@fit@W
 H<-nmfRes@fit@H
@@ -55,6 +55,8 @@ Winc<-W>softThresh+0
 KEGGenrichNMF<-lapply(enrichResNMF,function(x) x$result[x$result$source=="KEGG",])
 ReactomeEnrichNMF<-lapply(enrichResNMF,function(x) x$result[x$result$source=="REAC",])
 GOBPEnrichNMF<-lapply(enrichResNMF,function(x) x$result[x$result$source=="GO:BP",])
+rownames(H)<-c("Metabolic","Apoptosis","EMT")
+save(H,file=paste0(outputdata,"/H.Rdata"))
 
 #Supplementary Table 3:
 for(i in 1:length(KEGGenrichNMF)){
@@ -65,94 +67,6 @@ for(i in 1:length(KEGGenrichNMF)){
 }
 
 
-
-
-GOBPfilt<-GOBPEnrichNMF
-for(i in 1:length(GOBPEnrichNMF)){
-  GOBPfilt[[i]]<-GOBPfilt[[i]][GOBPfilt[[i]][,"recall"]>0.1,]
-}
-
-GOBPfilt2<-GOBPfilt
-
-for(i in 1:length(GOBPfilt)){
-  temp<-GOBPfilt[[i]]
-  temp<-temp[order(temp[,"p_value"],decreasing=F),]
-  nval<-min(nrow(temp),100)
-  GOBPfilt2[[i]]<-temp[1:nval,]
-}
-
-allKEGG<-unique(unlist(lapply(KEGGenrichNMF,function(x) x$term_name)))
-allREAC<-unique(unlist(lapply(ReactomeEnrichNMF,function(x) x$term_name)))
-allGOBP<-unique(unlist(lapply(GOBPfilt,function(x) x$term_name)))
-allGOBP2<-unique(unlist(lapply(GOBPfilt2,function(x) x$term_name)))
-
-KEGGmat<-matrix(NA,nrow=length(allKEGG),ncol=nrow(H),dimnames=list(allKEGG,paste0("Sig",1:urank)))
-
-Reacmat<-matrix(NA,nrow=length(allREAC),ncol=nrow(H),dimnames=list(allREAC,paste0("Sig",1:urank)))
-
-GOBPmat<-matrix(NA,nrow=length(allGOBP),ncol=nrow(H),dimnames=list(allGOBP,paste0("Sig",1:urank)))
-GOBPmat2<-matrix(NA,nrow=length(allGOBP2),ncol=nrow(H),dimnames=list(allGOBP2,paste0("Sig",1:urank)))
-
-for(i in 1:nrow(H)){
-  KEGGmat[KEGGenrichNMF[[i]][,"term_name"],i]<-(-log(KEGGenrichNMF[[i]][,"p_value"]))
-  Reacmat[ReactomeEnrichNMF[[i]][,"term_name"],i]<-(-log(ReactomeEnrichNMF[[i]][,"p_value"]))
-  
-  GOBPmat[GOBPfilt[[i]][,"term_name"],i]<-(-log(GOBPfilt[[i]][,"p_value"]))
-  GOBPmat2[GOBPfilt2[[i]][,"term_name"],i]<-(-log(GOBPfilt2[[i]][,"p_value"]))
-}
-outputdataU<-paste0(outputdata,"/NMFnqG",urank,"/")
-if(!dir.exists(outputdataU)){dir.create(outputdataU)}
-
-pdf(paste0(outputdataU,"/HeatmapGOBP_SigEnrichPval_filt100.pdf"),useDingbats = FALSE,height=12,width=6)
-print(pheatmap(GOBPmat2,fontsize_row=6,cluster_cols=FALSE,cluster_rows=FALSE,treeheight_col = 0,show_colnames=F,treeheight_row = 0))
-dev.off()
-
-pdf(paste0(outputdataU,"/HeatmapKEGG_SigEnrichPval.pdf"),useDingbats = FALSE)
-print(pheatmap(KEGGmat,cluster_cols=FALSE,cluster_rows=FALSE,treeheight_col = 0,show_colnames=F,treeheight_row = 0))
-dev.off()
-
-png(paste0(outputdataU,"/HeatmapKEGG_SigEnrichPval.png"),width=5,height=5,units="in",res=300,pointsize = 12)
-print(pheatmap(KEGGmat,cluster_cols=FALSE,cluster_rows=FALSE,treeheight_col = 0,show_colnames=F,treeheight_row = 0))
-dev.off()
-
-pdf(paste0(outputdataU,"/HeatmapReactome_SigEnrichPval.pdf"),useDingbats = FALSE)
-print(pheatmap(Reacmat,fontsize_row=6,cluster_cols=FALSE,cluster_rows=FALSE,treeheight_col = 0,show_colnames=F,treeheight_row = 0))
-dev.off()
-
-png(paste0(outputdataU,"/HeatmapReactome_SigEnrichPval.png"),width=5,height=5,units="in",res=300,pointsize = 12)
-print(pheatmap(Reacmat,fontsize_row=4,cluster_cols=FALSE,cluster_rows=FALSE,treeheight_col = 0,show_colnames=F,treeheight_row = 0))
-dev.off()
-
-pdf(paste0(outputdataU,"/HeatmapGOBP_SigEnrichPval.pdf"),useDingbats = FALSE)
-print(pheatmap(GOBPmat,fontsize_row=6,cluster_cols=FALSE,cluster_rows=FALSE,treeheight_col = 0,show_colnames=F,treeheight_row = 0))
-dev.off()
-
-png(paste0(outputdataU,"/HeatmapGOBP_SigEnrichPval.png"),width=5,height=5,units="in",res=300,pointsize = 12)
-print(pheatmap(GOBPmat,cluster_cols=FALSE,cluster_rows=FALSE,treeheight_col = 0,show_colnames=F,treeheight_row = 0))
-dev.off()
-
-
-
-
-annotSigs<-t(H)
-colnames(annotSigs)<-paste0("Signature",1:3)
-BinaryDep<-bDepletions[setdiff(topLRTgenes,union(PanCancerCoreFitnessGenes,CommonEssentialsAUC$cfgenes)),]
-
-
-
-annotCL<-data.frame(CT=cmp[match(colnames(bDepletions),cmp[,"model_id"]),"cancer_type"],
-                    Signature1=annotSigs[,1],Signature2=annotSigs[,2],Signature3=annotSigs[,3],stringsAsFactors = FALSE)
-
-rownames(annotCL)<-colnames(bDepletions)
-
-
-
-pdf(paste0(outputdata,"HeatmapDependencies.pdf"),width=3,height=5)
-print(pheatmap(BinaryDep,show_rownames = FALSE,show_colnames = FALSE,treeheight_row=0,treeheight_col=0,legend=FALSE,annotation_col=annotCL,annotation_legend = FALSE,color=colorRampPalette(c("white", "red","navy"))(50)))
-dev.off()
-png(paste0(outputdata,"BinaryHeatmapDependencies.png"),width=3,height=5,res=300,pointsize = 12,units="in")
-print(pheatmap(BinaryDep,show_rownames = FALSE,show_colnames = FALSE,treeheight_row=0,treeheight_col=0,annotation_col=annotCL,legend=FALSE,annotation_legend = FALSE,color=colorRampPalette(c("white", "red","navy"))(50)))
-dev.off()
 
 
 

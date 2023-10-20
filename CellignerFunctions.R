@@ -175,7 +175,8 @@ cell_line_tumor_class_plot <- function(cl_tumor_classes, alignment, tumor_CL_cor
                 rownames(classification_freq)))
   
   esophagus_tumor <- rep(0, ncol(classification_freq))
-  classification_freq <- rbind(classification_freq,`esophagus`= esophagus_tumor) 
+  thyroid_tumor <- rep(0, ncol(classification_freq))
+  classification_freq <- rbind(classification_freq,`esophagus`= esophagus_tumor,`thyroid`=thyroid_tumor) 
   common_types <- intersect(rownames(classification_freq), colnames(classification_freq))
   
   prop_agree <- sum(diag(as.matrix(classification_freq[common_types, common_types])))/sum(as.matrix(classification_freq[common_types, common_types]))

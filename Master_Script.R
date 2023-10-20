@@ -5,7 +5,7 @@ source("./CellignerFunctions.R")
 
 outputdata<-"../outputdata/"
 if(!dir.exists(outputdata)){dir.create(outputdata)}
-
+inputdata<-"../InputData/"
 
 #Overview of dependency data:
 source("./DependencyResults.R")
@@ -17,7 +17,6 @@ source("./DependencySignatures.R")
 source("./InputDataUsed.R")
 
 #for the Celligner Pan can clusters &figures:
-source("./GExpClusters.R")
 source("./Celligner_Checks.R")
 
 source("./ClinicalGeneExpressionMarkers.R")
@@ -30,6 +29,7 @@ source("./DMA_Analysis.R")
 source("./RWR_landscape.R")
 
 #Priority Target Results
+source("./Tractability_Comparison.R")
 source("./CancerType_PriorityResults.R")
 
 source("./PANCAN_PriorityResults.R")

@@ -15,14 +15,13 @@ load(file=paste0(inputdata,"GeneP2Downv2.rdata"))
 
 
 load(file=paste0(inputdata,"TCGAbems.Rdata"))
-#add in composite prevalence estimated for the transcriptional subtypes and the progeny subtypes?
 load(file=paste0(inputdata,"TsubtypeP.rdata"))
 load(file=paste0(inputdata,"TissueTypeColors.Rdata"))
 
 ctypeMapSubtype<-read.csv(paste0(inputdata,"cTypeMapSubtype.csv"),header=F,stringsAsFactors = F)
 ctypeMapSubtype$ctype<-make.names(ctypeMapSubtype[,1])
 
-#need to update, need to get the new lists 
+
 load(file=paste0(outputdata,"/GdfSplit.Rdata"))
 
 
@@ -73,7 +72,41 @@ ctypes<-unique(GdfSplit$ctype)
 
 #Get all the patient data available for cancer types included in our data set - this is total pan cancer number of patients.
 
-
+Get_PatientMarkers<-function(ctype){
+  tcgaid<-ctypeMapSubtype[match(ctype,make.names(ctypeMapSubtype[,1])),8]
+  #Check whether it is tissue or subtype and then get the correct matrices.
+  if(tcgaid%in%names(GeneP1Upv2)){
+    ExprInc<-GeneP1Upv2[[tcgaid]]
+    ExprDec<-GeneP1Downv2[[tcgaid]]
+  }else{
+    
+    ExprInc<-GeneP2Upv2[[tcgaid]]
+    ExprDec<-GeneP2Downv2[[tcgaid]]
+  }
+  colnames(ExprInc)<-unlist(sapply(colnames(ExprInc),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+  colnames(ExprDec)<-unlist(sapply(colnames(ExprDec),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+  ExpSamples<-intersect(colnames(ExprInc),colnames(ExprDec))
+  tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
+  CNgain<-CNgainMat[[tcgaid]]
+  CNloss<-CNlossMat[[tcgaid]]
+  #mutect, varscan:
+  tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
+  Mutmat1<-TCGAmut[[paste0(tcgaid,".mutect")]]
+  Mutmat2<-TCGAmut[[paste0(tcgaid,".varscan")]]
+  msamples<-intersect(colnames(Mutmat1),colnames(Mutmat2))
+  mgenes<-intersect(rownames(Mutmat1),rownames(Mutmat2))
+  Mmat<-Mutmat1[mgenes,msamples]+Mutmat2[mgenes,msamples]
+  
+  Mmat<-(Mmat==2)+0
+  
+  Psamples<-intersect(colnames(Mmat),intersect(intersect(colnames(CNgain),colnames(CNloss)),ExpSamples))
+  Nsamples<-length(Psamples)
+  if(Nsamples>0){
+    return(list(Nsamples=Nsamples,Mmat=Mmat,CNgain=CNgain,CNloss=CNloss,ExprInc=ExprInc,ExprDec=ExprDec))
+  }else{
+    return(NULL)
+  }
+}
 SampleNos<-list()
 for(i in ctypes){
   output<-Get_PatientMarkers(i)
@@ -82,6 +115,69 @@ for(i in ctypes){
   }
 }
 TotalSamples<-sum(unlist(SampleNos))
+Get_CTtargetPrevalence<-function(GdfInput,ExcludeMarkers=NULL,IncGroup,ExcNoNetwork=FALSE,ScoreThresh=0,incGexp=TRUE,GexpOnly=FALSE){
+  PrevMat<-list()
+  GdfSplit<-GdfInput
+  for(i in ctypes){
+    idx<-which(GdfSplit$ctype==i)
+    T1<-GdfSplit[idx,]
+    
+    Tall<-T1
+    Tall<-Tall[Tall$GROUP%in%IncGroup,]
+    Tall<-Tall[!Tall$MARKER%in%ExcludeMarkers,]
+    if(ExcNoNetwork){
+      Tall<-Tall[Tall$RWRscore>0,]
+    }
+    Tall<-Tall[Tall$PRIORITY>ScoreThresh,]
+ 
+    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),8]
+    #Check whether it is tissue or subtype and then get the correct matrices.
+    if(tcgaid%in%names(GeneP1Upv2)){
+      ExprInc<-GeneP1Upv2[[tcgaid]]
+      ExprDec<-GeneP1Downv2[[tcgaid]]
+    }else{
+  
+      ExprInc<-GeneP2Upv2[[tcgaid]]
+      ExprDec<-GeneP2Downv2[[tcgaid]]
+    }
+    colnames(ExprInc)<-unlist(sapply(colnames(ExprInc),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+    colnames(ExprDec)<-unlist(sapply(colnames(ExprDec),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+    
+    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
+    CNgain<-CNgainMat[[tcgaid]]
+    CNloss<-CNlossMat[[tcgaid]]
+    #mutect, varscan:
+    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
+    Mutmat1<-TCGAmut[[paste0(tcgaid,".mutect")]]
+    Mutmat2<-TCGAmut[[paste0(tcgaid,".varscan")]]
+    msamples<-intersect(colnames(Mutmat1),colnames(Mutmat2))
+    mgenes<-intersect(rownames(Mutmat1),rownames(Mutmat2))
+    Mmat<-Mutmat1[mgenes,msamples]+Mutmat2[mgenes,msamples]
+    
+    Mmat<-(Mmat==2)+0
+    if(length(msamples)>1&!is.null(ExprInc)){
+
+      Pmat<-NULL
+      if(GexpOnly){
+        try(Pmat<-Get_PrevalenceMatrix(Tall[Tall[,"MARKER_TYPE"]=="expr",],Mmat,CNgain,CNloss,ExprUp=ExprInc,ExprDown=ExprDec,Score="PRIORITY"))
+      }else{
+        if(incGexp){
+          try(Pmat<-Get_PrevalenceMatrix(Tall,Mmat,CNgain,CNloss,ExprUp=ExprInc,ExprDown=ExprDec,Score="PRIORITY"))
+        }else{
+          try(Pmat<-Get_PrevalenceMatrix(Tall,Mmat,CNgain,CNloss,Score="PRIORITY"))
+        }
+      }
+      PrevMat[[i]]<-Pmat
+     
+    }else{
+      PrevMat[[i]]<-NULL
+    
+    }
+    
+  }
+  return(PrevMat)
+
+}
 
 
 
@@ -96,6 +192,7 @@ PrevMatNoTP53noGE2<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers="TP53_mut",In
 PrevMatnoGE1<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers=NULL,IncGroup=c(1),ScoreThresh=0,incGexp = FALSE)
 PrevMatNoTP53noGE1<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers="TP53_mut",IncGroup=c(1),ScoreThresh = 0,incGexp = FALSE)
 PrevMatNoTP53G1<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers="TP53_mut",IncGroup=c(1),ScoreThresh = 0,incGexp = TRUE)
+PrevMatGE1<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers=NULL,IncGroup=c(1),ScoreThresh=0,incGexp = TRUE)
 
 Pall<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers=NULL,IncGroup=c(1,2,3),ScoreThresh=0)
 Pallno53<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers="TP53_mut",IncGroup=c(1,2,3),ScoreThresh=0)
@@ -113,7 +210,29 @@ GexpG12<-Get_CTtargetPrevalence(GdfSplit,ExcludeMarkers="TP53_mut",IncGroup=c(1,
 
 
 #All groups:
+Get_PatientPrev<-function(Pmat,removeTop=0,Nsamples){
+  if(removeTop!=0){
+    for(i in 1:length(Pmat)){
+      temp<-Pmat[[i]]
+      check<-sum(rowSums(temp,na.rm=T)/ncol(temp)<removeTop)>0
+      if(sum(check)>0){
+        Pmat[[i]]<-Pmat[[i]][check,]
+      }else{
+        Pmat[[i]]<-matrix(0,nrow=1,ncol=ncol(temp))
+      }
+    }
+    
+  }
 
+    NoPatientsOneTarget<-lapply(Pmat,function(x) try(colSums(x,na.rm=T)>0))
+    PropPatientperCT<-lapply(NoPatientsOneTarget,function(x) try(sum(x)/length(x)))
+    PropPatientpc<-sum(unlist(NoPatientsOneTarget)/Nsamples)
+  
+  TargetsPP<-lapply(Pmat,function(x) try(colSums(x,na.rm=T)))
+  TargetsPPperCT<-lapply(TargetsPP,mean)
+  TargetsPPpc<-mean(unlist(TargetsPPperCT))
+  return(list(PropCT=PropPatientperCT,PropPC=PropPatientpc,AvgTppCT=TargetsPPperCT,AvgTppPC=TargetsPPpc))
+}
 
 
 AllG<-Get_PatientPrev(Pall,Nsamples=TotalSamples)
@@ -121,30 +240,30 @@ AllG_no53<-Get_PatientPrev(Pallno53,Nsamples=TotalSamples)
 AllG_no53noGE<-Get_PatientPrev(Pallno53noGE,Nsamples=TotalSamples)
 
 
-cat(paste("Proportion patients pancan all: ",AllG$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=F)
-cat(paste("Proportion patients pancan all, no P53: ",AllG_no53$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Proportion patients pancan all, no P53 no GExp: ",AllG_no53noGE$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan all: ",AllG$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=F)
+cat(paste("Proportion patients pancan all, no P53: ",AllG_no53$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan all, no P53 no GExp: ",AllG_no53noGE$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
-cat(paste("Avg Targets PP pancan all: ",AllG$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Avg Targets PP pancan all, no P53: ",AllG_no53$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Avg Targets PP pancan all, no P53 no GExp: ",AllG_no53noGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan all: ",AllG$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan all, no P53: ",AllG_no53$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan all, no P53 no GExp: ",AllG_no53noGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
 AllG12<-Get_PatientPrev(PrevMat,Nsamples=TotalSamples)
 AllG12_no53<-Get_PatientPrev(PrevMatNoTP53,Nsamples=TotalSamples)
-cat(paste("Proportion patients pancan G1,2: ",AllG12$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Proportion patients pancan G1,2, no P53: ",AllG12_no53$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Avg Targets PP pancan G1,2: ",AllG12$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Avg Targets PP pancan G1,2, no P53: ",AllG12_no53$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan G1,2: ",AllG12$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan G1,2, no P53: ",AllG12_no53$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G1,2: ",AllG12$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G1,2, no P53: ",AllG12_no53$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
 G12_allnoGE<-Get_PatientPrev(PrevMatnoGE,Nsamples=TotalSamples)
 G12_no53noGE<-Get_PatientPrev(PrevMatNoTP53noGE,Nsamples=TotalSamples)
 
 
-cat(paste("Proportion patients pancan G12 no Gene Exp: ",G12_allnoGE$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Proportion patients pancan G12, no P53 no Gene Exp: ",G12_no53noGE$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan G12 no Gene Exp: ",G12_allnoGE$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan G12, no P53 no Gene Exp: ",G12_no53noGE$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
-cat(paste("Avg Targets PP pancan G12, no Gene Exp: ",G12_allnoGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Avg Targets PP pancan G12, no P53 no Gene Exp: ",G12_no53noGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G12, no Gene Exp: ",G12_allnoGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G12, no P53 no Gene Exp: ",G12_no53noGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
 
 
@@ -153,21 +272,21 @@ G2_all<-Get_PatientPrev(PrevMatG2,Nsamples=TotalSamples)
 G2_no53<-Get_PatientPrev(PrevMatNoTP53G2,Nsamples=TotalSamples)
 
 
-cat(paste("Proportion patients pancan G2: ",G2_all$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Proportion patients pancan G2, no P53: ",G2_no53$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan G2: ",G2_all$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan G2, no P53: ",G2_no53$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
-cat(paste("Avg Targets PP pancan G2: ",G2_all$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Avg Targets PP pancan G2, no P53: ",G2_no53$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G2: ",G2_all$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G2, no P53: ",G2_no53$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
 G2_allnoGE<-Get_PatientPrev(PrevMatnoGE2,Nsamples=TotalSamples)
 G2_no53noGE<-Get_PatientPrev(PrevMatNoTP53noGE2,Nsamples=TotalSamples)
 
 
-cat(paste("Proportion patients pancan G2 no Gene Exp: ",G2_allnoGE$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Proportion patients pancan G2, no P53 no Gene Exp: ",G2_no53noGE$PropPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan G2 no Gene Exp: ",G2_allnoGE$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Proportion patients pancan G2, no P53 no Gene Exp: ",G2_no53noGE$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
-cat(paste("Avg Targets PP pancan G2, no Gene Exp: ",G2_allnoGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
-cat(paste("Avg Targets PP pancan G2, no P53 no Gene Exp: ",G2_no53noGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G2, no Gene Exp: ",G2_allnoGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G2, no P53 no Gene Exp: ",G2_no53noGE$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
 #Group1:
 
@@ -198,7 +317,7 @@ IncGexp_g2<-IncG12-IncGexp_g1[names(unlist(IncG12))]
 #get total number of unique group 2 targets with patient prevalence of associated marker:
 inPatient<-lapply(PrevMatNoTP53noGE2,function(x) rownames(x)[rowSums(x)>0])
 inPatientTarget<-sapply(names(inPatient),function(x) sapply(inPatient[[x]],function(y) strsplit(y,x)[[1]][1]))
-cat(paste("Total number pancan G2, no P53 no Gene Exp: ",length(unique(unlist(inPatientTarget)))),file=paste0(outputdata,"/Prevalencelandscape.txt"),sep="\n",append=T)
+cat(paste("Total number pancan G2, no P53 no Gene Exp: ",length(unique(unlist(inPatientTarget)))),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
 
 #################################################################################################
 #                                                                                               #
@@ -206,6 +325,13 @@ cat(paste("Total number pancan G2, no P53 no Gene Exp: ",length(unique(unlist(in
 #                                                                                               #                                                                                           
 #                                                                                               #
 #################################################################################################
+#Group1:
+G1_all<-Get_PatientPrev(PrevMatGE1,Nsamples=TotalSamples)
+
+
+cat(paste("Proportion patients pancan G1: ",G1_all$PropPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+cat(paste("Avg Targets PP pancan G1: ",G1_all$AvgTppPC),file=paste0(outputdata,"/Prevalencelanoutputdatacape.txt"),sep="\n",append=T)
+
 G1_allnoGE<-Get_PatientPrev(PrevMatnoGE1,Nsamples=TotalSamples)
 G1_no53noGE<-Get_PatientPrev(PrevMatNoTP53noGE1,Nsamples=TotalSamples)
 
@@ -232,10 +358,10 @@ pdf(paste0(outputdata,"/CancerTypePropsG2.pdf"),useDingbats = FALSE)
 print(ggplot(PlotG2datange,aes(x=cancer_type,y=value,fill=variable))+geom_bar(stat="identity",position="dodge")+coord_flip()+theme_bw()+ scale_fill_brewer(palette="Accent"))
 dev.off()
 
-GdataCTAll<-data.frame(cancer_type=names(AllG$PropCT),Prop=unlist(AllG$PropCT),Name="AllG"
+GdataCTAll<-data.frame(cancer_type=names(AllG$PropCT),Prop=unlist(AllG$PropCT),Ntargets=unlist(AllG$AvgTppCT), Name="AllG"
                        ,stringsAsFactors = FALSE)
-GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(AllG_no53noGE$PropCT),Prop=unlist(AllG_no53noGE$PropCT),Name="All_noGExpno53"))
-GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G2_no53noGE$PropCT),Prop=unlist(G2_no53noGE$PropCT),Name="G2_noGExpno53"))
+GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(AllG_no53noGE$PropCT),Prop=unlist(AllG_no53noGE$PropCT),Ntargets=unlist(AllG_no53noGE$AvgTppCT),Name="All_noGExpno53"))
+GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G2_no53noGE$PropCT),Prop=unlist(G2_no53noGE$PropCT),Ntargets=unlist(G2_no53noGE$AvgTppCT),Name="G2_noGExpno53"))
 sortGdata<-GdataCTAll[GdataCTAll$Name=="G2_noGExpno53",]
 sortGdata<-sortGdata[order(sortGdata$Prop,decreasing=F),]
 GdataCTAll$cancer_type<-factor(GdataCTAll$cancer_type,levels=c(setdiff(GdataCTAll$cancer_type,sortGdata$cancer_type),unique(unlist(sortGdata[,"cancer_type"]))))
@@ -244,11 +370,44 @@ pdf(paste0(outputdata,"/Figure5a.pdf"),useDingbats = FALSE)
 print(ggplot(GdataCTAll[GdataCTAll$Name%in%c("AllG","All_noGExpno53","G2_noGExpno53"),],aes(x=cancer_type,y=Prop,fill=Name))+geom_bar(stat="identity",position="dodge")+coord_flip()+theme_bw()+ scale_fill_brewer(palette="Accent"))
 dev.off()
 
+pdf(paste0(outputdata,"/Figure5a_panel.pdf"),useDingbats = FALSE,height=7,width=7)
+print(ggplot(GdataCTAll[GdataCTAll$Name%in%c("AllG","All_noGExpno53","G2_noGExpno53"),],aes(x=cancer_type,y=Prop,fill=Name))+geom_bar(stat="identity")+facet_wrap(~Name,ncol=1)+theme_bw()+ scale_fill_brewer(palette="Accent")+theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)))
+dev.off()
+
+pdf(paste0(outputdata,"/Figure5a_panelNT.pdf"),useDingbats = FALSE,height=7,width=7)
+print(ggplot(GdataCTAll[GdataCTAll$Name%in%c("AllG","All_noGExpno53","G2_noGExpno53"),],aes(x=cancer_type,y=Ntargets,fill=Name))+geom_bar(stat="identity")+facet_wrap(~Name,ncol=1)+theme_bw()+ scale_fill_brewer(palette="Accent")+theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)))
+dev.off()
+
+GdataPC<-data.frame(Prop=G1_all$PropPC,Ntargets=G1_all$AvgTppPC,Name="Group1_All")
+GdataPC<-rbind(GdataPC,data.frame(Prop=AllG12$PropPC,Ntargets=AllG12$AvgTppPC,Name="Group12_All"))
+GdataPC<-rbind(GdataPC,data.frame(Prop=AllG_no53noGE$PropPC,Ntargets=AllG_no53noGE$AvgTppPC,Name="AllGroup_noGEno53"))
+
+pdf(paste0(outputdata,"/GroupProps_Compare.pdf"),useDingbats = FALSE)
+print(ggplot(GdataPC,aes(x=Name,y=Prop,fill=Name))+geom_bar(stat="identity",position="stack")+coord_flip()+theme_bw()+ scale_fill_brewer(palette="Paired"))
+dev.off()
+pdf(paste0(outputdata,"/GroupNtargets_Compare.pdf"),useDingbats = FALSE)
+print(ggplot(GdataPC,aes(x=Name,y=Ntargets,fill=Name))+geom_bar(stat="identity",position="stack")+coord_flip()+theme_bw()+ scale_fill_brewer(palette="Paired"))
+dev.off()
+
+GdataCTAll<-data.frame(cancer_type=names(AllG$PropCT),Prop=unlist(AllG$PropCT), Name="AllG"
+                       ,stringsAsFactors = FALSE)
+GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(AllG_no53noGE$PropCT),Prop=unlist(AllG_no53noGE$PropCT),Name="All_noGExpno53"))
+GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G2_no53noGE$PropCT),Prop=unlist(G2_no53noGE$PropCT),Name="G2_noGExpno53"))
+sortGdata<-GdataCTAll[GdataCTAll$Name=="G2_noGExpno53",]
+sortGdata<-sortGdata[order(sortGdata$Prop,decreasing=F),]
+GdataCTAll$cancer_type<-factor(GdataCTAll$cancer_type,levels=c(setdiff(GdataCTAll$cancer_type,sortGdata$cancer_type),unique(unlist(sortGdata[,"cancer_type"]))))
+GdataCTAll$Name<-factor(GdataCTAll$Name,levels=c("G2_noGExpno53","All_noGExpno53","AllG"))
+
+
 GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G1_allnoGE$PropCT),Prop=unlist(G1_allnoGE$PropCT),Name="G1_noGExp"))
 GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G1_no53$PropCT),Prop=unlist(G1_no53$PropCT),Name="G1_no53"))
 GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G1_no53noGE$PropCT),Prop=unlist(G1_no53noGE$PropCT),Name="G1_noGExpno53"))
 GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G12_no53noGE$PropCT),Prop=unlist(G12_no53noGE$PropCT),Name="G12_noGExpno53"))
 GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G12_allnoGE$PropCT),Prop=unlist(G12_allnoGE$PropCT),Name="G12_noGExp"))
+GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(G2_no53$PropCT),Prop=unlist(G2_no53$PropCT),Name="G2_no53"))
+GdataCTAll<-rbind(GdataCTAll,data.frame(cancer_type=names(AllG12_no53$PropCT),Prop=unlist(AllG12_no53$PropCT),Name="G12_no53"))
+
+
 #find missing cancer types to add in:
 setdiff(names(G1_no53noGE),names(G12_no53noGE))
 useCT<-union(names(G1_no53noGE$PropCT),names(G12_no53noGE$PropCT))
@@ -261,6 +420,28 @@ Psub1$cancer_type<-factor(Psub1$cancer_type,levels=c(setdiff(GdataCTAll$cancer_t
 Psub1$Name<-factor(Psub1$Name,levels=c("G12_noGExpInc","G1_noGExpno53"))
 pdf(paste0(outputdata,"/CancerTypePropsNoGE_1and2.pdf"),useDingbats = FALSE)
 print(ggplot(Psub1,aes(x=cancer_type,y=Prop,fill=Name))+geom_bar(stat="identity",position="stack")+coord_flip()+theme_bw()+ scale_fill_brewer(palette="Paired"))
+dev.off()
+
+Psub1.2<-GdataCTAll[GdataCTAll$Name%in%c("G1_noGExpno53","G12_noGExpno53"),]
+Psub1.2<-Psub1.2[order(Psub1.2$Prop,decreasing=F),]
+Psub1.2$cancer_type<-factor(Psub1.2$cancer_type,levels=c(setdiff(GdataCTAll$cancer_type,sortGdata$cancer_type),unique(unlist(sortGdata[,"cancer_type"]))))
+Psub1.2$Name<-factor(Psub1.2$Name,levels=c("G12_noGExpno53","G1_noGExpno53"))
+
+pdf(paste0(outputdata,"/CancerTypePropsNoGE_1and2_dumbbell.pdf"),useDingbats = FALSE)
+print(ggplot(aes(x=Prop,y=cancer_type),data=Psub1.2) +
+  geom_line(aes(group=cancer_type), color="#E7E7E7", size=2) + 
+  
+  geom_point(aes(color=Name), size=3) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="darkgrey"),
+        axis.title = element_blank(),
+        panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("purple", "orange"))+
+  scale_x_continuous(labels = scales::percent_format(scale = 1))
+)
 dev.off()
 
 Psub2<-GdataCTAll[GdataCTAll$Name%in%c("G1_noGExpno53","G12_noGExpno53"),]
@@ -281,6 +462,28 @@ pdf(paste0(outputdata,"/CancerTypePropsGE_1and2.pdf"),useDingbats = FALSE)
 print(ggplot(Psub3,aes(x=cancer_type,y=Prop,fill=Name))+geom_bar(stat="identity",position="stack")+coord_flip()+theme_bw()+ scale_fill_brewer(palette="Pastel1"))
 dev.off()
 
+
+Psub4<-GdataCTAll[GdataCTAll$Name%in%c("G1_no53","G12_no53"),]
+Psub4<-Psub4[order(Psub4$Prop,decreasing=F),]
+Psub4$cancer_type<-factor(Psub4$cancer_type,levels=c(setdiff(GdataCTAll$cancer_type,sortGdata$cancer_type),unique(unlist(sortGdata[,"cancer_type"]))))
+Psub4$Name<-factor(Psub4$Name,levels=c("G12_no53","G1_no53"))
+
+pdf(paste0(outputdata,"/CancerTypePropsGE_1and2_dumbbell.pdf"),useDingbats = FALSE)
+print(ggplot(aes(x=Prop,y=cancer_type),data=Psub4) +
+  geom_line(aes(group=cancer_type), color="#E7E7E7", size=2) + 
+  
+  geom_point(aes(color=Name), size=3) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.y = element_text(color="black"),
+        axis.text.x = element_text(color="darkgrey"),
+        axis.title = element_blank(),
+        panel.grid = element_blank()
+  ) +
+  scale_color_manual(values=c("purple", "orange"))+
+  scale_x_continuous(labels = scales::percent_format(scale = 1))
+)
+dev.off()
 #################################################################################################
 #                                                                                               #
 #   Plot target prevalence information for each cancer type                                     #
@@ -295,7 +498,7 @@ pCol<-c("blue","purple","orange")
 names(pCol)<-c("Mutation","Expression","CopyNumber")
 for(i in ctypes){
 
-  try(Plot_PrevalenceHM(PrevMat=PrevMat[[i]],GdfSplit,plotCol=pCol,outputname=paste0(outputdata,i),DFA=NULL))
+  try(Plot_PrevalenceHM(PrevMat=PrevMat[[i]],GdfSplit,plotCol=pCol,outputname=paste0(outputdata,i),DFA=NULL,Score="PRIORITY"))
  
 }
 

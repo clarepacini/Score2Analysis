@@ -31,12 +31,13 @@ allrwr<-allrwr[!is.na(allrwr$AnovaClass),]
 #                                                                                               #
 #                                                                                               #
 #################################################################################################
-
+Usegroups<-c("SyntheticLethal","LoF_other_SL","LoF_mutation_SL","Paralog","SelfAddiction_Mutation","SelfAddiction_Expression","SelfAddiction_Variant","OncogenicAddiction_Act",
+             "SelfAddiction_CN","AddictionND")
 DFRdataT<-cbind(DFRdata,DFRsplit[,c(1:11,13:14)])
-DFRuse<-DFRdataT[rowSums(DFRdataT[,33:45])>0,]
+DFRuse<-DFRdataT[rowSums(DFRdataT[,35:47])>0,]
 DFRuse$AddictionGroup<-rowSums(DFRuse[,c("SelfAddiction_Mutation","SelfAddiction_Expression","SelfAddiction_Variant","Target_cancerDriverAct",
                                          "SelfAddiction_CN","SelfAddiction_Protein","Target_Activating")])
-DFRuse$SLset<-rowSums(DFRuse[,c("SL","Paralog","LoFSLmut","LoFSLother")])
+DFRuse$SLset<-rowSums(DFRuse[,c("SyntheticLethal","Paralog","LoFSLmut","LoFSLother")])
 DFRuse$SelfAddictionGroup<-rowSums(DFRuse[,c("SelfAddiction_Mutation","SelfAddiction_Expression","SelfAddiction_Variant",
                                          "SelfAddiction_CN","SelfAddiction_Protein")])
 DFRuse$ExcSelfAddictionGroup<-rowSums(DFRuse[,c("Target_cancerDriverAct",
@@ -65,19 +66,19 @@ cat(paste("Number dependencies with signif RWR score:",length(unique(DFRnonzero$
 #################################################################################################
 
 cmat<-matrix(0,nrow=2,ncol=5)
-rownames(cmat)<-c("Addiction","SL")
+rownames(cmat)<-c("Addiction","SyntheticLethal")
 colnames(cmat)<-c("100","75","50","25","0")
 cmatSA<-cmat
-rownames(cmatSA)<-c("SelfAddiction","SL")
+rownames(cmatSA)<-c("SelfAddiction","SyntheticLethal")
 cmatNo<-cmat
-rownames(cmatNo)<-c("ExcSelfAddiction","SL")
+rownames(cmatNo)<-c("ExcSelfAddiction","SyntheticLethal")
 for(i in 1:nrow(DFRuse)){
   slgroup<-DFRuse[i,"SLset"]
   #if(slgroup%in%c("SL","LoF_other_SL","LoF_mutation_SL","Paralog")){
   if(slgroup>0){
     rgroup<-as.character(DFRuse[i,"RWRscore"])
-    cmat["SL",rgroup]<-cmat["SL",rgroup]+1
-    cmatNo["SL",rgroup]<-cmatNo["SL",rgroup]+1
+    cmat["SyntheticLethal",rgroup]<-cmat["SyntheticLethal",rgroup]+1
+    cmatNo["SyntheticLethal",rgroup]<-cmatNo["SyntheticLethal",rgroup]+1
   }
 
   slgroup<-DFRuse[i,"AddictionGroup"]
@@ -257,43 +258,3 @@ for(i in 1:nrow(allPC)){
 
 chisquareRes<-contingencyPlot(PCcont,filename="CorrPlot_Map_AovRWRpc",outputdata)
 write.table(chisquareRes$pvalTable,file=paste0(outputdata,"/SupplementaryTable10.tsv"),quote=F,sep="\t")
-
-load(paste0(outputdata,"normLRTresnq.Rdata"))
-allPC$normLRT<-normLRTres$LRT[allPC$Depleted.Gene]
-RWRmax<-allPC[allPC$RWRscore=="100",]
-BMmaxA<-allPC[allPC$AnovaClass%in%c("A","B"),]
-
-assocGroups<-c("normLRT","DepDegree","BMdegree","nDepLines")
-BMGroups<-c("B","C","D")
-RWRgroups<-c("75","50","25")
-WilcoxRes<-NULL
-for(i in BMGroups){
-  for(j in assocGroups){
-    WtPval<-wilcox.test(RWRmax[RWRmax$AnovaClass=="A",j],RWRmax[RWRmax$AnovaClass==i,j])$p.value
-    tempOut<-data.frame(BMclass1="A",BMclass2=i,Group1=j,Group2="RWRmax",
-                        Group1Median=median(RWRmax[RWRmax$AnovaClass=="A",j]),Group2Median=median(RWRmax[RWRmax$AnovaClass==i,j]),Pval=WtPval,stringsAsFactors = FALSE)
-    WilcoxRes<-rbind(WilcoxRes,tempOut)
-  }
-}
-for(i in RWRgroups){
-  for(j in assocGroups){
-    WtPval<-wilcox.test(BMmaxA[BMmaxA$RWRscore=="100",j],BMmaxA[BMmaxA$RWRscore==i,j])$p.value
-    tempOut<-data.frame(BMclass1="100",BMclass2=i,Group1=j,Group2="BMmax",
-                        Group1Median=median(BMmaxA[BMmaxA$RWRscore=="100",j]),Group2Median=median(BMmaxA[BMmaxA$RWRscore==i,j]),Pval=WtPval,stringsAsFactors = FALSE)
-    WilcoxRes<-rbind(WilcoxRes,tempOut)
-  }
-}
-
-write.table(WilcoxRes,file=paste0(outputdata,"/SupplementaryTable11.tsv"),quote=F,sep="\t",row.names=F)
-
-load(paste0(inputdata,"/curated_BAGEL_essential.rdata"))
-load(paste0(inputdata,"/curated_BAGEL_nonEssential.rdata"))
-
-load(paste0(inputdata,"/pcgene.rdata"))
-
-curatedEssDeg<-degreelist[pcgene[match(curated_BAGEL_essential,pcgene$symbol),"string_id"]]
-curatedNEssDeg<-degreelist[pcgene[match(curated_BAGEL_nonEssential,pcgene$symbol),"string_id"]]
-
-cat(paste("Wilcox test p-value, degree ess non-ess genes:",wilcox.test(curatedEssDeg,curatedNEssDeg)$p.value),file=paste0(outputdata,"RWRlandscape.txt"),append=T,sep="\n")
-
-

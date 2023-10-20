@@ -2,7 +2,7 @@ options(repos = c("https://www.stats.bris.ac.uk/R/"))
 options(repos = c("https://cran.rstudio.com/"))
 cran_packages <- c('ggplot2','ggrepel','tidyverse','RColorBrewer','NMF','gprofiler2','pheatmap','beeswarm',
                    'reshape2', 'dplyr', 'data.table', 'Seurat','devtools','survival','GGally','stringr','heatmap3',
-                   'igraph','magrittr','Matrix','corrplot','mclust','diptest','VennDiagram','circlize','remotes')
+                   'igraph','magrittr','Matrix','corrplot','mclust','diptest','VennDiagram','circlize','remotes','pwrss')
 new_cran_packages <- cran_packages[!(cran_packages %in% installed.packages()[,"Package"])]
 if(length(new_cran_packages)) install.packages(new_cran_packages)
 
@@ -53,7 +53,7 @@ library(ComplexHeatmap)
 library(progeny)
 library(maftools)
 library(heatmap3)
-
+library(pwrss)
 
 
 

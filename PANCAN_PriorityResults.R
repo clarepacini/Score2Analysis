@@ -8,6 +8,7 @@ GLOBAL<-read.table(file=paste0(inputdata,'Table_S9_allPriority_WithPPI_allPANCAN
 
 load(paste0(inputdata,'priority_threshold_all_PANCAN.RData'))
 load(paste0(inputdata,'39_allMarkers_all_PANCAN.Rdata'))
+load(paste0(inputdata,'39_allMarkers_all_PANCAN.Rdata'))
 load(paste0(inputdata,'/Pvectors_PANCAN.RData'))
 load(paste0(inputdata,'/PAI_PANCAN.RData'))
 load(paste0(inputdata,'/PAB_PANCAN.RData'))
@@ -43,16 +44,7 @@ MARKERclass<-allMarkers
 
 TOTRES<-GLOBAL[,c("ctype","TARGET","PRIORITY","TRACTABILITY","MARKERCLASS","RWRscore")]
 colnames(TOTRES)[4]<-"BUCKET"
-superPriorityPlot(TOTRES=TOTRES,allMarkers=allMarkers,plotname=outputdata,TissueColors=cvec,shape="Biomarker",indi="RWR",plotsuffix="SuperPriorityPlotPC.pdf")
 
+superPriorityPlot(TOTRES=TOTRES,allMarkers=allMarkers,plotname=outputdata,TissueColors=cvec,shape="Biomarker",indi="RWR",plotsuffix="SuperPriorityPlotPC.pdf",Priority="PRIORITY")
 
-png(paste0(outputdata,'/CancerTypesuperPlot_PANCAN.png'),width=8,height=5,units="in",res=300,pointsize = 12)
-
-priorSet<-NULL
-CEX<-2
-print(priorityPlot2(ctype = "PANCAN",
-                    PAB,
-                    th,sigOnly = TRUE,IDENTIFY = FALSE,CEX = CEX,inputPriority="",priorSet = priorSet,
-                    TissueTypeColors=cvec,PAI=PAI,Pvectors=Pvectors,allMarkers=allMarkers,priorityres = GLOBAL))
-dev.off()
 

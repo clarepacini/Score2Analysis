@@ -1,125 +1,137 @@
-Get_PatientPrev<-function(Pmat,removeTop=0,Nsamples){
-  if(removeTop!=0){
-    for(i in 1:length(Pmat)){
-      temp<-Pmat[[i]]
-      check<-sum(rowSums(temp,na.rm=T)/ncol(temp)<removeTop)>0
-      if(sum(check)>0){
-        Pmat[[i]]<-Pmat[[i]][check,]
-      }else{
-        Pmat[[i]]<-matrix(0,nrow=1,ncol=ncol(temp))
-      }
-    }
-    
+SummaryPlot<-function(Dep,Marker,MarkerType,MarkerVal,ctype,logFC,annot,cellcol,SigMat,RegressD=NULL){
+  par(mfrow=c(2,2), mai = c(0.8, 0.5, 0.5, 0.8))
+  out<-NULL
+  #plot_Biomarkers(Dep,Marker,MarkerType,MarkerVal,ctype=ctype,logFC=logFC,annot=annot,pointcol=NULL,celllinecol=cellcol,outputdir="./")
+  if(ctype!="PANCAN"){
+  CL<-intersect(annot[annot$cancer_type==ctype,"model_id"],colnames(logFC))
+  }else{
+    CL<-colnames(logFC)
   }
-
-    NoPatientsOneTarget<-lapply(Pmat,function(x) try(colSums(x,na.rm=T)>0))
-    PropPatientperCT<-lapply(NoPatientsOneTarget,function(x) try(sum(x)/length(x)))
-    PropPatientpc<-sum(unlist(NoPatientsOneTarget)/Nsamples)
-  
-  TargetsPP<-lapply(Pmat,function(x) try(colSums(x,na.rm=T)))
-  TargetsPPperCT<-lapply(TargetsPP,mean)
-  TargetsPPpc<-mean(unlist(TargetsPPperCT))
-  return(list(PropCT=PropPatientperCT,PropPC=PropPatientpc,AvgTppCT=TargetsPPperCT,AvgTppPC=TargetsPPpc))
-}
-Get_CTtargetPrevalence<-function(GdfInput,ExcludeMarkers=NULL,IncGroup,ExcNoNetwork=FALSE,ScoreThresh=0,incGexp=TRUE,GexpOnly=FALSE){
-  PrevMat<-list()
-  GdfSplit<-GdfInput
-  for(i in ctypes){
-    idx<-which(GdfSplit$ctype==i)
-    T1<-GdfSplit[idx,]
+  colpalette<-c("purple","lightgreen","orange","red")
+  for(i in 1:nrow(SigMat)){
+    plot(logFC[Dep,CL],SigMat[i,CL],ylab=rownames(SigMat)[i],xlab=paste("logFC",Dep),col=colpalette[i],pch=21,bg=colpalette[i])
+    cout<-cor.test(logFC[Dep,CL],SigMat[i,CL])
+    corval<-cout$estimate
+    corpval<-cout$p.value
     
-    Tall<-T1
-    Tall<-Tall[Tall$GROUP%in%IncGroup,]
-    Tall<-Tall[!Tall$MARKER%in%ExcludeMarkers,]
-    if(ExcNoNetwork){
-      Tall<-Tall[Tall$RWRscore>0,]
-    }
-    Tall<-Tall[Tall$PRIORITY>ScoreThresh,]
- 
-    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),8]
-    #Check whether it is tissue or subtype and then get the correct matrices.
-    if(tcgaid%in%names(GeneP1Upv2)){
-      ExprInc<-GeneP1Upv2[[tcgaid]]
-      ExprDec<-GeneP1Downv2[[tcgaid]]
-    }else{
-  
-      ExprInc<-GeneP2Upv2[[tcgaid]]
-      ExprDec<-GeneP2Downv2[[tcgaid]]
-    }
-    colnames(ExprInc)<-unlist(sapply(colnames(ExprInc),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
-    colnames(ExprDec)<-unlist(sapply(colnames(ExprDec),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
+    mtext(paste(signif(corval,3),signif(corpval,3),sep=";"),side=3)
     
-    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
-    CNgain<-CNgainMat[[tcgaid]]
-    CNloss<-CNlossMat[[tcgaid]]
-    #mutect, varscan:
-    tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
-    Mutmat1<-TCGAmut[[paste0(tcgaid,".mutect")]]
-    Mutmat2<-TCGAmut[[paste0(tcgaid,".varscan")]]
-    msamples<-intersect(colnames(Mutmat1),colnames(Mutmat2))
-    mgenes<-intersect(rownames(Mutmat1),rownames(Mutmat2))
-    Mmat<-Mutmat1[mgenes,msamples]+Mutmat2[mgenes,msamples]
-    
-    Mmat<-(Mmat==2)+0
-    if(length(msamples)>1&!is.null(ExprInc)){
-
-      Pmat<-NULL
-      if(GexpOnly){
-        try(Pmat<-Get_PrevalenceMatrix(Tall[Tall[,"MARKER_TYPE"]=="expr",],Mmat,CNgain,CNloss,ExprUp=ExprInc,ExprDown=ExprDec))
-      }else{
-        if(incGexp){
-          try(Pmat<-Get_PrevalenceMatrix(Tall,Mmat,CNgain,CNloss,ExprUp=ExprInc,ExprDown=ExprDec))
-        }else{
-          try(Pmat<-Get_PrevalenceMatrix(Tall,Mmat,CNgain,CNloss))
-        }
-      }
-      PrevMat[[i]]<-Pmat
-     
-    }else{
-      PrevMat[[i]]<-NULL
-    
-    }
-    
+    temp<-data.frame(Target=Dep,Ctype=ctype,corval=corval,corpval=corpval,Sig=rownames(SigMat)[i],stringsAsFactors = FALSE)
+    out<-rbind(out,temp)
   }
-  return(PrevMat)
-
+  
+  return(out)
+  
 }
-Get_PatientMarkers<-function(ctype){
-  tcgaid<-ctypeMapSubtype[match(ctype,make.names(ctypeMapSubtype[,1])),8]
-  #Check whether it is tissue or subtype and then get the correct matrices.
-  if(tcgaid%in%names(GeneP1Upv2)){
-    ExprInc<-GeneP1Upv2[[tcgaid]]
-    ExprDec<-GeneP1Downv2[[tcgaid]]
+
+Get_FCscore<-function(L2, site,FCdata) {
+  ns <- ncol(L2)
+  nc <- ns/15
+  L2score <- NULL
+  FCscore<-NULL
+  maxScore<-NULL
+  FCdata<-FCdata[rownames(L2),]
+  for (j in 1:nc) {
+    currentBlock <- L2[, (15 * (j - 1) + 1):(15 * j)]
+    colnames(currentBlock)<-make.names(colnames(currentBlock))
+    if (site == "Combined") {
+      currentL2filter <- (currentBlock[, 1] > 0 & currentBlock[, 
+                                                               2] != 1 & currentBlock[, 3] != 1 & currentBlock[, 
+                                                                                                               5] > 0)
+      currentL2score <- (currentBlock[, 4] * 22 + currentBlock[, 
+                                                               6] * 16 + currentBlock[, 7] * 16 + currentBlock[, 
+                                                                                                               8] * 16 + currentBlock[, 12] * 10 + currentBlock[, 
+                                                                                                                                                                13] * 10 + currentBlock[, 15] * 10)
+      currentM<-rowSums(currentBlock[,c(4,6,7,8)])
+    }
+    else {
+      currentL2filter <- (currentBlock[, 1] > 0 & currentBlock[, 
+                                                               2] != 1 & currentBlock[, 3] != 1)
+      currentL2score <- (currentBlock[, 4] * 12.5 + currentBlock[, 
+                                                                 5] * 12.5 + currentBlock[, 6] * 12.5 + currentBlock[, 
+                                                                                                                     7] * 12.5 + currentBlock[, 8] * 12.5 + currentBlock[, 
+                                                                                                                                                                         12] * 12.5 + currentBlock[, 13] * 12.5 + currentBlock[, 
+                                                                                                                                                                                                                               15] * 12.5)
+      
+      currentM<-rowSums(currentBlock[,c(4,5,6,7,8)]) 
+    }
+    currentFCscore<-FCdata[,strsplit(as.character(colnames(currentBlock)[1]),"_",fixed=T)[[1]][1]]
+    currentL2score <- currentL2score * (currentL2filter + 
+                                          0)
+    currentFCscore <- currentFCscore * (currentL2filter + 
+                                          0)
+    
+    FCscore<-cbind(FCscore,currentFCscore)
+    L2score <- cbind(L2score, currentL2score)
+    maxScore<-cbind(maxScore,currentM)
+  }
+  return(list(L2score,FCscore,maxScore))
+}
+
+globalVolcano2<-function(TOTRES,TissueColors,pvalcol="FEATURE_ANOVA_pval",signCol="FEATURE_deltaMEAN_ESS",effectSize="FEATURE_ESS_effect_size",hitids,ctype,single=FALSE,
+                        idpoints=NULL,legend=TRUE,FDRthresh=NULL,FEATUREcol="FEATURE",DEPcol="Depeleted Gene"){
+  
+  y<- -log10(as.numeric(TOTRES[,pvalcol]))
+  if(is.na(signCol)){
+    x<-as.numeric(TOTRES[,effectSize])
+  }else{
+    x<- sign(as.numeric(TOTRES[,signCol]))*as.numeric(TOTRES[,effectSize])
+  }
+  if(is.null(FDRthresh)){
+    
   }else{
     
-    ExprInc<-GeneP2Upv2[[tcgaid]]
-    ExprDec<-GeneP2Downv2[[tcgaid]]
+    idnonsig<-which(TOTRES[,"FDR"]>FDRthresh)
+    
+    
+    
+    smoothScatter(x[idnonsig],y[idnonsig],nrpoints = 0,frame.plot=FALSE,xlab='signed effect size',
+                  ylab='-log p-value',bandwidth = c(0.75,0.75),
+                  colramp = colorRampPalette(c("white", 'black')),nbin = c(200,200),xlim=c(min(x)-0.01,max(x)+0.01),ylim=c(0,max(y)+2))
+    if(!is.null(hitids)){
+      idnonsig<-setdiff(1:nrow(TOTRES),c(hitids,idnonsig))
+      points(x[idnonsig],y[idnonsig],bg=makeTransparent("grey"),pch=21,col=makeTransparent("grey"))
+      
+    }
   }
-  colnames(ExprInc)<-unlist(sapply(colnames(ExprInc),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
-  colnames(ExprDec)<-unlist(sapply(colnames(ExprDec),function(x) paste0(strsplit(x,".",fixed=T)[[1]][1:3],collapse="-")))
-  ExpSamples<-intersect(colnames(ExprInc),colnames(ExprDec))
-  tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
-  CNgain<-CNgainMat[[tcgaid]]
-  CNloss<-CNlossMat[[tcgaid]]
-  #mutect, varscan:
-  tcgaid<-ctypeMapSubtype[match(i,make.names(ctypeMapSubtype[,1])),3]
-  Mutmat1<-TCGAmut[[paste0(tcgaid,".mutect")]]
-  Mutmat2<-TCGAmut[[paste0(tcgaid,".varscan")]]
-  msamples<-intersect(colnames(Mutmat1),colnames(Mutmat2))
-  mgenes<-intersect(rownames(Mutmat1),rownames(Mutmat2))
-  Mmat<-Mutmat1[mgenes,msamples]+Mutmat2[mgenes,msamples]
+  if(single){
+    COLS<-TissueColors[ctype]}else{
+      COLS<-TissueColors[unlist(TOTRES[,1])]
+    }
   
-  Mmat<-(Mmat==2)+0
-  
-  Psamples<-intersect(colnames(Mmat),intersect(intersect(colnames(CNgain),colnames(CNloss)),ExpSamples))
-  Nsamples<-length(Psamples)
-  if(Nsamples>0){
-    return(list(Nsamples=Nsamples,Mmat=Mmat,CNgain=CNgain,CNloss=CNloss,ExprInc=ExprInc,ExprDec=ExprDec))
+  allct<-unique(unlist(TOTRES[,1]))
+  TissueColors<-TissueColors[allct]
+  if(is.null(FDRthresh)){
+    id<-hitids
+    plot(x[id],y[id],bg=makeTransparent(COLS[id]),pch=21,col=makeTransparent(COLS[id]),frame.plot=FALSE,xlab='signed effect size',ylab='-log p-value')
   }else{
-    return(NULL)
+    
+    if(!is.null(hitids)){
+      id<-hitids
+    }else{
+      id<-which(as.numeric(TOTRES[,"FDR"])<FDRthresh )
+    }
+    
+    points(x[id],y[id],bg=makeTransparent(COLS[id]),pch=21,col=makeTransparent(COLS[id]))
+    
   }
+  if(legend){
+    legend("topright",legend=gsub("."," ",names(TissueColors),fixed = T),col=TissueColors,lty=1,cex=0.4)
+  }
+  #abline(v= -1,col='gray')
+  #abline(v= 1,col='gray')
+  
+  
+  #points(x[id],y[id],bg=makeTransparent(COLS[id]),pch=21,col=COLS[id],cex=1.2)
+  if(is.null(idpoints)){
+    par(xpd=TRUE)
+    idpoints<-identify(x[id],y[id],paste(TOTRES[id,FEATUREcol],':',TOTRES[id,DEPcol],'_dep',sep=''),cex=0.5)
+    return(list(res=TOTRES[id,],points=idpoints))}else{
+      text(x[id[idpoints]],y[id[idpoints]],paste(gsub("_"," ",TOTRES[id[idpoints],FEATUREcol],fixed=T),':',TOTRES[id[idpoints],DEPcol],sep=''),cex=0.5)
+    }
 }
-                                   AdamTissue<-function(Binary,annot,returnTissue=FALSE){
+
+AdamTissue<-function(Binary,annot,returnTissue=FALSE){
   CCRlabels<-data.frame(name=colnames(Binary),sidm=annot[match(colnames(Binary),annot$model_id),"tissue"],bid=annot[match(colnames(Binary),annot$BROAD_ID),"tissue"],stringsAsFactors = FALSE)
   
   CCRlabels[is.na(CCRlabels[,2]),2]<-0
@@ -469,11 +481,11 @@ get_DMA<-function(PriorityResults,paraloglist,LoFgenes,markerColumn
     
     if(sum(check)>0){
       SL[i]<-1
-      GLOBAL[i,"SLgroup"]<-ifelse(GLOBAL[i,"SLgroup"]!="",paste(GLOBAL[i,"SLgroup"],"SL",sep=","),"SL")
+      GLOBAL[i,"SLgroup"]<-ifelse(GLOBAL[i,"SLgroup"]!="",paste(GLOBAL[i,"SLgroup"],"SyntheticLethal",sep=","),"SyntheticLethal")
     }
   }
   TargetTypeMatrix<-cbind(TargetTypeMatrix,SL)
-  
+  colnames(TargetTypeMatrix)[ncol(TargetTypeMatrix)]<-"SyntheticLethal"
   
   
   #sel<-which(GLOBAL$SLgroup%in%c("","OncogenicAddiction_Act","OncogenicAddiction_Amb"))
@@ -1315,7 +1327,7 @@ makeTransparent<-function(someColor, alpha=100){
   apply(newColor, 2, function(curcoldata){rgb(red=curcoldata[1], green=curcoldata[2],
                                               blue=curcoldata[3],alpha=alpha, maxColorValue=255)})
 }
-superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=50,ylims=c(30,90),shape=NULL,indi=NULL,pointsize=2,plotsuffix=NULL){
+superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=50,ylims=c(30,90),shape=NULL,indi=NULL,pointsize=2,plotsuffix=NULL,Priority="PRIORITYL3"){
   if(!is.null(shape)){
     TOTRES$shape<-23
     TOTRES[TOTRES$MARKERCLASS%in%c("A","B","C","D"),"shape"]<-21
@@ -1351,7 +1363,7 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
     
     id<-which(TOTRES$BUCKET==uu[i] & TOTRES$ctype!='PANCAN')
     id<-which(TOTRES$BUCKET==uu[i])
-    id<-id[order(TOTRES$PRIORITY[id],decreasing = TRUE)]
+    id<-id[order(TOTRES[id,Priority],decreasing = TRUE)]
     
     genes<-TOTRES$TARGET[id]
     
@@ -1363,16 +1375,16 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
       xc<-seq(uu[i]-0.4,uu[i]+0.4,0.8/(ngenes-1))
     }
     
-    points(xc,TOTRES$PRIORITY[id],pch=TOTRES$shape[id],cex=4,
+    points(xc,TOTRES[id,Priority],pch=TOTRES$shape[id],cex=4,
            bg=TissueColors_tr[TOTRES$ctype[id]],col=TissueColors[TOTRES$ctype[id]])
     if(sum(!is.na(TOTRES$symbol[id]))>0){
       idcheck<-id[which(!is.na(TOTRES$symbol[id]))]
-      points(xc[which(!is.na(TOTRES$symbol[id]))],TOTRES$PRIORITY[idcheck],pch=TOTRES$symbol[idcheck],cex=2)
+      points(xc[which(!is.na(TOTRES$symbol[id]))],TOTRES[idcheck,Priority],pch=TOTRES$symbol[idcheck],cex=2)
     }
     #text(xc,TOTRES$PRIORITY[id],genes,pos = 4,cex=0.2)
     
     ALLX<-c(ALLX,xc)
-    ALLY<-c(ALLY,TOTRES$PRIORITY[id])
+    ALLY<-c(ALLY,TOTRES[id,Priority])
     ALLLAB<-c(ALLLAB,genes)
   }
   
@@ -1392,7 +1404,7 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
   targets<-unique(unlist(allMarkers[which(is.element(allMarkers$Depleted.Gene,targets) & is.element(allMarkers$CLASS,c('A','B','C'))),3]))
   currentTOTRES<-TOTRES[id,]
   currentTOTRES<-currentTOTRES[which(is.element(currentTOTRES$TARGET,targets)),]
-  currentTOTRES<-currentTOTRES[order(currentTOTRES$PRIORITY,decreasing = TRUE),]
+  currentTOTRES<-currentTOTRES[order(currentTOTRES[,Priority],decreasing = TRUE),]
   
   
   
@@ -1402,7 +1414,7 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
   targets<-unique(unlist(allMarkers[which(is.element(allMarkers$Depleted.Gene,targets) & is.element(allMarkers$CLASS,c('A','B','C'))),3]))
   currentTOTRES<-TOTRES[id,]
   currentTOTRES<-currentTOTRES[which(is.element(currentTOTRES$TARGET,targets)),]
-  currentTOTRES<-currentTOTRES[order(currentTOTRES$PRIORITY,decreasing = TRUE),]
+  currentTOTRES<-currentTOTRES[order(currentTOTRES[,Priority],decreasing = TRUE),]
   
   
   
@@ -1413,7 +1425,7 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
     
     id<-which(TOTRES$BUCKET==uu[i] & TOTRES$ctype!='PANCAN')
     id<-which(TOTRES$BUCKET==uu[i])
-    id<-id[order(TOTRES$PRIORITY[id],decreasing = TRUE)]
+    id<-id[order(TOTRES[id,Priority],decreasing = TRUE)]
     
     genes<-TOTRES$TARGET[id]
     
@@ -1425,23 +1437,23 @@ superPriorityPlot<-function(TOTRES,allMarkers,plotname,TissueColors,textThresh=5
       xc<-seq(uu[i]-0.4,uu[i]+0.4,0.8/(ngenes-1))
     }
     
-    points(xc,TOTRES$PRIORITY[id],pch=TOTRES$shape[id],cex=1,
+    points(xc,TOTRES[id,Priority],pch=TOTRES$shape[id],cex=1,
            bg=TissueColors_tr[TOTRES$ctype[id]],col=TissueColors[TOTRES$ctype[id]])
     if(sum(!is.na(TOTRES$symbol[id]))>0){
       idcheck<-id[which(!is.na(TOTRES$symbol[id]))]
-      points(xc[which(!is.na(TOTRES$symbol[id]))],TOTRES$PRIORITY[idcheck],pch=TOTRES$symbol[idcheck],cex=1)
+      points(xc[which(!is.na(TOTRES$symbol[id]))],TOTRES[idcheck,Priority],pch=TOTRES$symbol[idcheck],cex=1)
     }
     nID<-length(id)
     for(k in 1:nID){
-      if(TOTRES$PRIORITY[id[k]]>textThresh){
-        text(xc[k],TOTRES$PRIORITY[id[k]],genes[k],pos = 4,cex=pointsize)
+      if(TOTRES[id[k],Priority]>textThresh){
+        text(xc[k],TOTRES[id[k],Priority],genes[k],pos = 4,cex=pointsize)
         if(i==1){
           print(TOTRES[id[k],])
         }
       }
     }
     ALLX<-c(ALLX,xc)
-    ALLY<-c(ALLY,TOTRES$PRIORITY[id])
+    ALLY<-c(ALLY,TOTRES[id,Priority])
     ALLLAB<-c(ALLLAB,genes)
   }
   plot(0,0,xlim=c(0,4),ylim=c(1,length(TissueColors)))
@@ -1553,7 +1565,7 @@ msplitF<-function(markerrow,featCol="FEATURE",typeCol="MARKER_TYPE",assoCol="ASS
   return(newRes)
 }
 
-Get_PrevalenceMatrix<-function(PriorityTargets,MutMat,CNgain,CNloss,ExprMat=NULL,ExprUp=NULL,ExprDown=NULL,Mcol="MARKER_TYPE",Score="PRIORITY"){
+Get_PrevalenceMatrix<-function(PriorityTargets,MutMat,CNgain,CNloss,ExprMat=NULL,ExprUp=NULL,ExprDown=NULL,Mcol="MARKER_TYPE",Score="PRIORITYL3"){
   PT<-PriorityTargets[order(PriorityTargets[,Score],decreasing=T),]
   PT$M<-unlist(sapply(PT$MARKER,function(x) gsub(" ","",strsplit(x,"_",fixed=T)[[1]][1])))
   if(!is.null(ExprMat)){
@@ -1636,7 +1648,7 @@ Get_PrevalenceMatrix<-function(PriorityTargets,MutMat,CNgain,CNloss,ExprMat=NULL
   return(PriorityMatrix)
 }
 
-Plot_PrevalenceHM<-function(PrevMat,PriorityRes,plotCol,outputname=NULL,DFA=NULL,PSorder=FALSE){
+Plot_PrevalenceHM<-function(PrevMat,PriorityRes,plotCol,outputname=NULL,DFA=NULL,PSorder=FALSE,Score="PRIORITYL3"){
   inputMat<-PrevMat[rowSums(PrevMat,na.rm=T)>0,]
   inputMat<-inputMat[order(rowSums(inputMat),decreasing=T),]
   PRes<-PriorityRes[PriorityRes$ID%in%rownames(inputMat),]
@@ -1725,7 +1737,7 @@ Plot_PrevalenceHM<-function(PrevMat,PriorityRes,plotCol,outputname=NULL,DFA=NULL
   tractCols = brewer.pal(7,"Blues")
   names(tractCols)<-as.character(c(1:7))
   
-  PScore<-PRes[match(nTargets,paste(PRes$TARGET,PRes$M,sep=":")),"PRIORITY"]
+  PScore<-PRes[match(nTargets,paste(PRes$TARGET,PRes$M,sep=":")),Score]
   names(PScore)<-nTargets
   PScore<-as.numeric(PScore)
   Tgroups<-as.character(PRes[match(nTargets,paste(PRes$TARGET,PRes$M,sep=":")),"GROUP"])

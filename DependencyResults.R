@@ -61,39 +61,6 @@ df[df$value<10,"type"]<-"Other"
 rownames(df)<-NULL
 df<-df%>%group_by(name,type)%>%summarise(value=sum(value))%>%as.data.frame(.)
 
-lvl0 <- tibble(name = "Parent", value = 0, level = 0, fill = NA)
-
-lvl1 <- df %>%
-  group_by(name) %>%
-  summarise(value = sum(value)) %>%
-  ungroup() %>%
-  mutate(level = 1) %>%
-  mutate(fill = name)
-
-lvl2 <- df %>%
-  dplyr::select(name = type, value, fill = name) %>%
-  mutate(level = 2)
-
-
-
-pdf(paste0(outputdata,"/SunburstScreens.pdf"),useDingbats = FALSE,width=8,height=8)
-bind_rows(lvl0, lvl1, lvl2) %>%
-  mutate(name = as.factor(name) %>% fct_reorder2(fill, value)) %>%
-  arrange(fill, name) %>%
-  mutate(level = as.factor(level)) %>%
-  ggplot(aes(x = level, y = value, fill = fill, alpha = level)) +
-  geom_col(width = 1, color = "gray90", size = 0.25, position = position_stack()) +
-  geom_text(aes(label = name), size = 5, position = position_stack(vjust = 0.5)) +
-  coord_polar(theta = "y") +
-  scale_alpha_manual(values = c("0" = 0, "1" = 1, "2" = 0.7), guide = F) +
-  scale_x_discrete(breaks = NULL) +
-  scale_y_continuous(breaks = NULL) +
-  scale_fill_manual(values=TissueColours, na.translate = F) +
-  labs(x = NULL, y = NULL) +
-  theme_minimal()+
-  theme(legend.position="none")
-dev.off()
-
 
 
 CancerTypeColours<-unique(AllCrispr$CANCER_TYPE)
@@ -247,19 +214,25 @@ lrtplotdata$nGroup<-signif(lrtplotdata$nDep,1)
 lrtplotdata[lrtplotdata$nDep<10,'nGroup']<-10
 lrtplotdata[lrtplotdata$nDep>200,'nGroup']<-200
 
-pdf(paste0(outputdata,"/normLRTranks.pdf"),width=10,height=5)
 
-print(ggplot(aes(x=xval,y=yval,label=gene,size=nDep),data=lrtplotdata)+geom_point()+geom_text_repel(colour="blue",size=4,max.overlaps = 50)+
+
+pdf(paste0(outputdata,"/normLRTranks_colour.pdf"),width=10,height=5)
+#,col=nDep
+print(ggplot(aes(x=xval,y=yval,label=gene,color=nGroup),data=lrtplotdata)+geom_point(aes(color=nGroup,size=.7))+geom_text_repel(colour="blue",size=4,max.overlaps = 50)+
         ylab("Selectivity: normLRT")+xlab("Rank")+theme(panel.background = element_rect(fill="white",color="grey",linetype="solid",size=0.5),
                                                         panel.grid.major = element_line(size = 0.5, linetype = 'solid',
                                                                                         colour = "grey"), 
                                                         panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
                                                                                         colour = "grey"))+
         ylim(0,2000)+
-        scale_size(range=c(2,10),breaks=c(0,25,50,75,100,200,500,750),labels=c(">=0",">=25",">=50",">=75",">=100",">=200",">=500",">=750"),guide="legend"))
-      #+custom_colors)
+        scale_color_viridis_c())
+
+#+custom_colors)
 
 dev.off()
+
+
+
 
 #zoom to just top 50 genes:
 lrtplotdata<-data.frame(xval=1:50,yval=sort(LRT,decreasing=T)[1:50],gene=topLRTgenes[1:50],nDep=nDeps[topLRTgenes[1:50]],stringsAsFactors = FALSE)
@@ -267,19 +240,19 @@ lrtplotdata$nGroup<-signif(lrtplotdata$nDep,1)
 lrtplotdata[lrtplotdata$nDep<10,'nGroup']<-10
 lrtplotdata[lrtplotdata$nDep>200,'nGroup']<-200
 
-pdf(paste0(outputdata,"/normLRTranks_Zoom.pdf"),width=10,height=5)
-
-print(ggplot(aes(x=xval,y=yval,label=gene,size=nDep),data=lrtplotdata)+geom_point()+geom_text_repel(colour="blue",size=4,max.overlaps = 50)+
+pdf(paste0(outputdata,"/normLRTranks_Zoom_Colour.pdf"),width=10,height=5)
+#,col=nDep
+print(ggplot(aes(x=xval,y=yval,label=gene,color=nGroup),data=lrtplotdata)+geom_point(aes(color=nGroup,size=1.5))+geom_text_repel(colour="blue",size=4,max.overlaps = 50)+
         ylab("Selectivity: normLRT")+xlab("Rank")+theme(panel.background = element_rect(fill="white",color="grey",linetype="solid",size=0.5),
                                                         panel.grid.major = element_line(size = 0.5, linetype = 'solid',
                                                                                         colour = "white"), 
                                                         panel.grid.minor = element_line(size = 0.25, linetype = 'solid',
                                                                                         colour = "white"))+
-        scale_size(range=c(2,10),breaks=c(0,25,50,75,100,200,500,750),labels=c(">=0",">=25",">=50",">=75",">=100",">=200",">=500",">=750"),guide="legend"))
+        scale_color_viridis_c()
+)
 
 
 dev.off()
-
 
 
 
@@ -323,6 +296,67 @@ cat(paste("Median number context specific essentials:",median(plotdata$NumberCor
 cat(paste("Range number context specific essentials:",range(plotdata$NumberCore)),file=paste0(outputdata,"/DependencyResults.txt"),sep="\n",append=T)
 
 cat(paste("Number pancancer core essentials:",length(PanCancerCoreFitnessGenes)),file=paste0(outputdata,"/DependencyResults.txt"),sep="\n",append=T)
+
+#################################################################################################
+#                                                                                               #
+#   Bootstrap Tissue specific core fitness genes analysis                                       #
+#                                                                                               #
+#                                                                                               #
+#################################################################################################
+
+
+
+load(file=paste0(inputdata,"NcoreF300.Rdata"))
+load(file=paste0(inputdata,"NcoreF500.Rdata"))
+load(file=paste0(inputdata,"Ntissue500.Rdata"))
+load(file=paste0(inputdata,"Ntissue300.Rdata"))
+#plot how many tissue could run analysis for per sampled dataset:
+Ntissueplot<-rbind(data.frame(NT=Ntissue300,Nsamples=rep(300,length(Ntissue300))),
+                   data.frame(NT=Ntissue500,Nsamples=rep(500,length(Ntissue500))))
+Ntissueplot$Nsamples<-as.factor(Ntissueplot$Nsamples)
+pdf(paste0(outputdata,"/Boxplot_NumberTissue_Downsample.pdf"),useDingbats = FALSE,width=3,height=4)
+print(ggplot(data=Ntissueplot,aes(x=Nsamples,y=NT))+geom_boxplot(outlier.size=0.8)+
+  geom_jitter(color="black", size=0.8, alpha=1,width=0.25,height=0)+theme_bw()+xlab("Number cell lines sampled")+ylab("Number tissue identified core-fitness genes")+ylim(0,21)+geom_hline(yintercept=20, linetype="dashed"))
+dev.off()
+
+plot300<-NULL
+for(i in 1:length(NcoreF300)){
+  if(!is.null(NcoreF300[[i]])){
+    temp<-data.frame(NcF<-NcoreF300[[i]],Tissue=rep(names(NcoreF300)[i],length(NcoreF300[[i]])))
+    plot300<-rbind(plot300,temp)
+  }
+}
+plot300$Tissue<-gsub("."," ",fixed=T,plot300$Tissue)
+plot300$Tissue<-factor(plot300$Tissue,levels=plotdata[order(plotdata$NumberCore),"Tissue"])
+
+pdf(paste0(outputdata,"NumberCoreSpecificEssentials_DS300.pdf"),useDingbats = FALSE,width=4,height=6)
+print(ggplot(plot300,aes(fill=Tissue,y=NcF....NcoreF300..i..,x=Tissue))+geom_boxplot(outlier.size = 0.4)+
+        coord_flip()+scale_fill_manual(values=labcols)+theme_bw()+theme(legend.position="none")+
+        geom_jitter(color="black", size=0.4, alpha=0.7,width=0.25,height=0)+ylab("Number tissue-specific core Fitness Genes"))
+dev.off()
+
+plot500<-NULL
+for(i in 1:length(NcoreF500)){
+  if(!is.null(NcoreF500[[i]])){
+    temp<-data.frame(NcF<-NcoreF500[[i]],Tissue=rep(names(NcoreF500)[i],length(NcoreF500[[i]])))
+    plot500<-rbind(plot500,temp)
+  }
+}
+plot500$Tissue<-gsub("."," ",fixed=T,plot500$Tissue)
+plot500$Tissue<-factor(plot500$Tissue,levels=plotdata[order(plotdata$NumberCore),"Tissue"])
+
+pdf(paste0(outputdata,"NumberCoreSpecificEssentials_DS500.pdf"),useDingbats = FALSE,width=4,height=6)
+print(ggplot(plot500,aes(fill=Tissue,y=NcF....NcoreF500..i..,x=Tissue))+geom_boxplot(outlier.size = 0.4)+
+        coord_flip()+scale_fill_manual(values=labcols)+theme_bw()+theme(legend.position="none")+
+        geom_jitter(color="black", size=0.4, alpha=0.7,width=0.25,height=0)+ylab("Number tissue-specific core Fitness Genes"))
+dev.off()
+
+#################################################################################################
+#                                                                                               #
+#   Tissue selective dependency analysis                                                        #
+#                                                                                               #
+#                                                                                               #
+#################################################################################################
 
 
 
@@ -375,6 +409,52 @@ gout4<-ggplot(data=as.data.frame(fcdata),aes(x=tissueType,y=value,fill=variable)
 pdf(paste0(outputdata,"/NumberByFC_tissue.pdf"),useDingbats = FALSE)
 print(gout4)
 dev.off()
+
+#################################################################################################
+#                                                                                               #
+#   Cumulative Tissue selective dependency analysis                                             #
+#                                                                                               #
+#                                                                                               #
+#################################################################################################
+CumRes<-list()
+CumulativePoints<-seq(0,1,0.1)
+for(i in tissuetypes){
+  tissueID<-i
+  modelIDs<-AllCrispr[AllCrispr$TISSUE==i,"INSTITUTE_ID"]
+  load(paste(inputdata,'/09_ADM_',tissueID,'_coreFitnessGenes.Rdata',sep=''))
+  #allcore<-c(allcore,coreFitnessGenes)
+  sel<-inputFCdata[setdiff(rownames(inputFCdata),coreFitnessGenes),modelIDs]
+  
+  IsDepleted<-(sel<(-1.5))+0
+  PropDep<-rowSums(IsDepleted,na.rm=T)/ncol(IsDepleted)
+  AtOne<-PropDep[PropDep!=0]
+  
+  CumRes[[i]]<-data.frame(tissue=i,xvalues=CumulativePoints,NumberGenes=sapply(CumulativePoints,function(x) sum(AtOne>x)),stringsAsFactors = FALSE)
+  
+  
+}
+
+pgenes_10<-lapply(CumRes,function(x) x[1,"NumberGenes"]/sum(x[,"NumberGenes"]))
+summary(unlist(pgenes_10))
+CdataAll<-do.call('rbind',CumRes)
+
+TColours<-TissueColours
+names(TColours)<-make.names(names(TissueColours))
+gout5<-ggplot(data=as.data.frame(CdataAll),aes(x=xvalues,y=NumberGenes,colour=tissue))+geom_line()+
+  scale_colour_manual(values=TColours[tissuetypes])+
+  theme_bw()+xlab("Percent of cell lines depleted")+ylab("Number of Genes")
+pdf(paste0(outputdata,"/CumulativeDepletions_tissue.pdf"),useDingbats = FALSE,width=6,height=4)
+print(gout5)
+dev.off()
+
+#################################################################################################
+#                                                                                               #
+#   Comparison tissue core versus selective dependencies                                        #
+#                                                                                               #
+#                                                                                               #
+#################################################################################################
+
+
 
 corefc<-do.call('rbind',TSGfc_tissue)
 Reffc<-do.call('rbind',RefCF)
